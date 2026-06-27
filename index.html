@@ -9036,6 +9036,45 @@ function laborTypeLabel(n){
   if(nF>0)    p.push(nF+'F');
   return p.length?p.join('+'):'-';
 }
+// 임가공 정산용 미니 창호 도면 (독립 — 셀 구조 + OPEN/FIX 표시 + 전체 치수)
+function laborMiniSVG(item){
+  const wo = item && item.wo;
+  if(!wo || !Array.isArray(wo.cells) || !wo.cells.length) return '';
+  const W = wo.W || item.W || 0, H = wo.H || item.H || 0;
+  if(!W || !H) return '';
+  const cells = wo.cells;
+  const BOX_W=180, BOX_H=140, PAD_L=20, PAD_R=24, PAD_T=20, PAD_B=20;
+  const SC = Math.min((BOX_W-PAD_L-PAD_R)/W, (BOX_H-PAD_T-PAD_B)/H);
+  const sw=W*SC, sh=H*SC;
+  const OX=(BOX_W-PAD_R+PAD_L-sw)/2 < PAD_L ? PAD_L : (BOX_W-sw-PAD_R+PAD_L)/2;
+  const OY=PAD_T+((BOX_H-PAD_T-PAD_B)-sh)/2;
+  let s = `<svg viewBox="0 0 ${BOX_W} ${BOX_H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:180px;height:auto;display:block;margin:auto">`;
+  s += `<rect x="${OX.toFixed(1)}" y="${OY.toFixed(1)}" width="${sw.toFixed(1)}" height="${sh.toFixed(1)}" fill="#b8c8e0" stroke="#3355bb" stroke-width="2"/>`;
+  cells.forEach(c=>{
+    const x=OX+(c.x0||0)*SC, y=OY+(c.y0||0)*SC, w=(c.cW||0)*SC, h=(c.cH||0)*SC;
+    const ct=c.ct, isFix=c.isFix||ct==='FIX';
+    const fill=isFix?'#c4d4e4':'#dce8fa', stk=isFix?'#556677':'#2244aa';
+    s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" stroke="${stk}" stroke-width="1"/>`;
+    if(!isFix){
+      const cx=x+w/2;
+      if(ct==='TS'){
+        s += `<line x1="${(x+w*0.15).toFixed(1)}" y1="${(y+h/2).toFixed(1)}" x2="${(x+w*0.85).toFixed(1)}" y2="${(y+h/2).toFixed(1)}" stroke="#c0392b" stroke-width="1.5" stroke-linecap="round"/>`;
+      } else if(ct==='PROJ'){
+        s += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="3 2"/>`;
+        s += `<line x1="${(x+w).toFixed(1)}" y1="${y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="3 2"/>`;
+      } else {
+        s += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+w).toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.8" opacity="0.65"/>`;
+        s += `<line x1="${(x+w).toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.8" opacity="0.65"/>`;
+      }
+    }
+    const lbl = isFix?'FIX':(ct==='TT'?'T/T':ct==='TO'?'T/O':ct==='TS'?'T/S':ct==='PROJ'?'PJ':ct==='DOOR'?'DR':ct);
+    s += `<text x="${(x+w/2).toFixed(1)}" y="${(y+h/2+2.5).toFixed(1)}" font-size="7" fill="#2a3550" text-anchor="middle" font-weight="700" opacity="0.9">${lbl}</text>`;
+  });
+  s += `<text x="${(OX+sw/2).toFixed(1)}" y="${(OY-6).toFixed(1)}" font-size="8.5" fill="#c0392b" text-anchor="middle" font-weight="700">${W}</text>`;
+  s += `<text x="${(OX+sw+9).toFixed(1)}" y="${(OY+sh/2).toFixed(1)}" font-size="8.5" fill="#c0392b" text-anchor="middle" font-weight="700" transform="rotate(90 ${(OX+sw+9).toFixed(1)} ${(OY+sh/2).toFixed(1)})">${H}</text>`;
+  s += `</svg>`;
+  return s;
+}
 // 임가공 비용 정산 HTML
 function getBatchLaborCostHTML(){
   if(!orderItems.length) return '';
@@ -9052,6 +9091,7 @@ function getBatchLaborCostHTML(){
     grand += amount; totalQty += qty;
     const area = (((item.W||0)*(item.H||0))/1e6).toFixed(2);
     rowsHtml += `<tr style="background:${idx%2?'#f5fbfa':'#fff'}">
+      <td style="border:1px solid #cfe3df;padding:4px;text-align:center;width:190px">${laborMiniSVG(item)}</td>
       <td style="${tdC}">${idx+1}</td>
       <td style="${tdC}">${item.mark||'-'}</td>
       <td style="${tdC};font-weight:700;color:#0d5048">${laborTypeLabel(n)}</td>
@@ -9072,6 +9112,7 @@ function getBatchLaborCostHTML(){
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#e6f4f1">
+        <th style="${thS};width:190px">도면</th>
         <th style="${thS}">No</th>
         <th style="${thS}">부호</th>
         <th style="${thS}">구분</th>
@@ -9084,7 +9125,7 @@ function getBatchLaborCostHTML(){
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot><tr style="background:#0d7a6f;color:#fff;font-weight:900">
-        <td colspan="8" style="border:1px solid #0d7a6f;padding:8px;text-align:right">합계 (VAT 별도)</td>
+        <td colspan="9" style="border:1px solid #0d7a6f;padding:8px;text-align:right">합계 (VAT 별도)</td>
         <td style="border:1px solid #0d7a6f;padding:8px;text-align:right;font-family:monospace">${fmt(grand)}</td>
       </tr></tfoot>
     </table>
