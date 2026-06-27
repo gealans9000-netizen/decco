@@ -10076,8 +10076,8 @@ function batchExcel(){
       const rows = maxR + 1, cols = maxC + 1;
       function reduceForCell(cell){
         let left, right, top, bot;
-        const vMuls = mullions.filter(m => m.dir === 'v');
-        const hMuls = mullions.filter(m => m.dir === 'h');
+        const vMuls = mullions.filter(m => m.dir === 'v' || m.dir === '수직');
+        const hMuls = mullions.filter(m => m.dir === 'h' || m.dir === '수평');
         if(cell.c === 0) left = frameThick + adLeft;
         else { const m = vMuls[cell.c - 1]; const t = m ? (MUL_EXT_THICK[m.type] || 92) : 92; left = t / 2; }
         if(cell.c === cols - 1) right = frameThick + adRight;
@@ -12894,8 +12894,8 @@ function printGlassScreenList(opt){
     function reduceForCell(cell){
       let left, right, top, bot;
       
-      const vMuls = mullions.filter(m => m.dir === 'v');
-      const hMuls = mullions.filter(m => m.dir === 'h');
+      const vMuls = mullions.filter(m => m.dir === 'v' || m.dir === '수직');
+      const hMuls = mullions.filter(m => m.dir === 'h' || m.dir === '수평');
       
       // 좌측: c=0이면 외구 (프레임 + 덧바 좌), 아니면 인접 수직 중간바/2
       if(cell.c === 0) left = frameThick + adLeft;
