@@ -9036,45 +9036,343 @@ function laborTypeLabel(n){
   if(nF>0)    p.push(nF+'F');
   return p.length?p.join('+'):'-';
 }
-// 임가공 정산용 미니 창호 도면 (독립 — 셀 구조 + OPEN/FIX 표시 + 전체 치수)
-function laborMiniSVG(item){
-  const wo = item && item.wo;
-  if(!wo || !Array.isArray(wo.cells) || !wo.cells.length) return '';
-  const W = wo.W || item.W || 0, H = wo.H || item.H || 0;
-  if(!W || !H) return '';
-  const cells = wo.cells;
-  const BOX_W=180, BOX_H=140, PAD_L=20, PAD_R=24, PAD_T=20, PAD_B=20;
-  const SC = Math.min((BOX_W-PAD_L-PAD_R)/W, (BOX_H-PAD_T-PAD_B)/H);
-  const sw=W*SC, sh=H*SC;
-  const OX=(BOX_W-PAD_R+PAD_L-sw)/2 < PAD_L ? PAD_L : (BOX_W-sw-PAD_R+PAD_L)/2;
-  const OY=PAD_T+((BOX_H-PAD_T-PAD_B)-sh)/2;
-  let s = `<svg viewBox="0 0 ${BOX_W} ${BOX_H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:180px;height:auto;display:block;margin:auto">`;
-  s += `<rect x="${OX.toFixed(1)}" y="${OY.toFixed(1)}" width="${sw.toFixed(1)}" height="${sh.toFixed(1)}" fill="#b8c8e0" stroke="#3355bb" stroke-width="2"/>`;
-  cells.forEach(c=>{
-    const x=OX+(c.x0||0)*SC, y=OY+(c.y0||0)*SC, w=(c.cW||0)*SC, h=(c.cH||0)*SC;
-    const ct=c.ct, isFix=c.isFix||ct==='FIX';
-    const fill=isFix?'#c4d4e4':'#dce8fa', stk=isFix?'#556677':'#2244aa';
-    s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" stroke="${stk}" stroke-width="1"/>`;
-    if(!isFix){
-      const cx=x+w/2;
-      if(ct==='TS'){
-        s += `<line x1="${(x+w*0.15).toFixed(1)}" y1="${(y+h/2).toFixed(1)}" x2="${(x+w*0.85).toFixed(1)}" y2="${(y+h/2).toFixed(1)}" stroke="#c0392b" stroke-width="1.5" stroke-linecap="round"/>`;
-      } else if(ct==='PROJ'){
-        s += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="3 2"/>`;
-        s += `<line x1="${(x+w).toFixed(1)}" y1="${y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.9" stroke-dasharray="3 2"/>`;
-      } else {
-        s += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+w).toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.8" opacity="0.65"/>`;
-        s += `<line x1="${(x+w).toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+h).toFixed(1)}" stroke="#c0392b" stroke-width="0.8" opacity="0.65"/>`;
+// 임가공 정산용 창호 도면 (견적서 도면과 동일 스타일)
+  function windowDiagramSVG(item, wo){
+    const W = wo.W || item.W;
+    const H = wo.H || item.H;
+    const cells = wo.cells || [];
+    const fw = wo.fw_px || 44;
+    const handlePos = wo.handlePos || 'right';
+    const _hhl = wo.handleHeightLabel || 'center';
+    // handleHeightLabel은 한국어('상부'/'하부'/'중앙') 또는 영어 둘 다 처리
+    const handleHeightLabel = (_hhl==='상부'||_hhl==='top') ? 'top'
+                            : (_hhl==='하부'||_hhl==='bottom') ? 'bottom'
+                            : 'center';
+
+    // SVG 박스 크기 및 스케일 — 치수선(우측 숫자 가로표기) 공간 확보를 위해 BOX 축소
+    const PAD_L=44, PAD_R=58, PAD_T=38, PAD_B=52;
+    const BOX_W=300, BOX_H=250;
+    const SC = Math.min((BOX_W - PAD_L - PAD_R) / W, (BOX_H - PAD_T - PAD_B) / H);
+    const sw = W * SC, sh = H * SC;
+    const OX = PAD_L, OY = PAD_T;
+    const sc = v => v * SC;
+
+    const DIM_COL = '#111', DIM_FONT = 8;
+    const FRAME_STK  = '#3355bb', FRAME_FILL = '#b8c8e0';
+    const SASH_STK   = '#2244aa', SASH_FILL  = '#dce8fa';
+    const FIX_FILL   = '#c4d4e4', FIX_STK    = '#556677';
+    const MUL_COL    = '#4466bb';
+
+    // ── 핸들 그리기 ──
+    function drawHandle(cx, cy, cellH_px, leverUp, isDigitalLock){
+      if(isDigitalLock){
+        // 디지털 도어락 (미니 도면용 — 간략 표현)
+        const totalH = Math.max(cellH_px * 0.20, 9);
+        const lockW  = totalH * 0.42;
+        const lockH  = totalH;
+        const x = cx - lockW/2, y = cy - lockH/2;
+        let h='';
+        h+=`<rect x="${x}" y="${y}" width="${lockW}" height="${lockH}" rx="2" fill="#1e1e2a" stroke="#0a0a14" stroke-width="1"/>`;
+        // LCD 화면
+        h+=`<rect x="${x+lockW*0.15}" y="${y+lockH*0.08}" width="${lockW*0.7}" height="${lockH*0.20}" rx="1" fill="#3aa0ff"/>`;
+        // 키패드 점들 (3x3 — 미니 버전이라 단순화)
+        const dotR = Math.max(0.5, lockW*0.07);
+        for(let r2=0;r2<3;r2++) for(let c2=0;c2<3;c2++){
+          const dx=x+lockW*(0.25+c2*0.25), dy=y+lockH*(0.40+r2*0.13);
+          h+=`<circle cx="${dx}" cy="${dy}" r="${dotR}" fill="rgba(255,255,255,0.85)"/>`;
+        }
+        // 손잡이
+        h+=`<line x1="${x+lockW*0.20}" y1="${y+lockH*0.88}" x2="${x+lockW*0.80}" y2="${y+lockH*0.88}" stroke="#7a7a85" stroke-width="${Math.max(1, lockW*0.18)}" stroke-linecap="round"/>`;
+        return h;
       }
+      // Hoppe 스타일 사각 핸들 (빨간색) — 미니 도면용 단순 버전
+      const totalH = Math.max(cellH_px * 0.10, 6);
+      const rW = totalH * 0.38, rH = totalH * 0.48, rR = 1.5;
+      const levH = totalH * 0.95, levT = Math.max(2.0, totalH * 0.16);
+      const colBase = '#d92e2e', colDark = '#a01818';
+      const colHi = 'rgba(255,255,255,0.40)';
+      let h='';
+      // 로제트 (베이스 플레이트)
+      h+=`<rect x="${cx-rW/2}" y="${cy-rH/2}" width="${rW}" height="${rH}" rx="${rR}" fill="${colBase}" stroke="${colDark}" stroke-width="1"/>`;
+      h+=`<rect x="${cx-rW/2+0.5}" y="${cy-rH/2+0.5}" width="${rW-1}" height="${rH*0.35}" rx="${rR*0.7}" fill="${colHi}"/>`;
+      // 레버
+      let vy1, vy2;
+      if(leverUp){ vy1=cy-rH*0.1; vy2=vy1-levH; }
+      else        { vy1=cy+rH*0.1; vy2=vy1+levH; }
+      const levX = cx - levT/2;
+      const levMinY = Math.min(vy1, vy2);
+      const levMaxY = Math.max(vy1, vy2);
+      h+=`<rect x="${levX}" y="${levMinY}" width="${levT}" height="${levMaxY-levMinY}" rx="${levT*0.2}" fill="${colBase}" stroke="${colDark}" stroke-width="0.8"/>`;
+      // 레버 끝 처리
+      if(leverUp){
+        h+=`<rect x="${levX}" y="${vy2}" width="${levT}" height="${levT*0.45}" rx="${levT*0.30}" fill="${colDark}"/>`;
+      } else {
+        h+=`<rect x="${levX}" y="${vy2-levT*0.45}" width="${levT}" height="${levT*0.45}" rx="${levT*0.30}" fill="${colDark}"/>`;
+      }
+      return h;
     }
-    const lbl = isFix?'FIX':(ct==='TT'?'T/T':ct==='TO'?'T/O':ct==='TS'?'T/S':ct==='PROJ'?'PJ':ct==='DOOR'?'DR':ct);
-    s += `<text x="${(x+w/2).toFixed(1)}" y="${(y+h/2+2.5).toFixed(1)}" font-size="7" fill="#2a3550" text-anchor="middle" font-weight="700" opacity="0.9">${lbl}</text>`;
-  });
-  s += `<text x="${(OX+sw/2).toFixed(1)}" y="${(OY-6).toFixed(1)}" font-size="8.5" fill="#c0392b" text-anchor="middle" font-weight="700">${W}</text>`;
-  s += `<text x="${(OX+sw+9).toFixed(1)}" y="${(OY+sh/2).toFixed(1)}" font-size="8.5" fill="#c0392b" text-anchor="middle" font-weight="700" transform="rotate(90 ${(OX+sw+9).toFixed(1)} ${(OY+sh/2).toFixed(1)})">${H}</text>`;
-  s += `</svg>`;
-  return s;
-}
+
+    // ── 열림방향 그리기 ──
+    function drawOpenDir(ct, sx, sy, sW, sH, hcx){
+      const col='#4a5a7a', dashCol='#7a6a30', dotCol='#e03030', lw=0.9;
+      let h='';
+      function invV(style){
+        const mx=sx+sW/2, topY=sy, botY=sy+sH;
+        let s='';
+        if(style==='solid'){
+          s+=`<line x1="${mx}" y1="${topY}" x2="${sx}" y2="${botY}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+          s+=`<line x1="${mx}" y1="${topY}" x2="${sx+sW}" y2="${botY}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+        } else {
+          s+=`<line x1="${mx}" y1="${topY}" x2="${sx}" y2="${botY}" stroke="${dashCol}" stroke-width="${lw}" stroke-dasharray="4 2" opacity="0.85"/>`;
+          s+=`<line x1="${mx}" y1="${topY}" x2="${sx+sW}" y2="${botY}" stroke="${dashCol}" stroke-width="${lw}" stroke-dasharray="4 2" opacity="0.85"/>`;
+        }
+        s+=`<circle cx="${mx}" cy="${topY}" r="2.5" fill="${dotCol}" opacity="0.9"/>`;
+        return s;
+      }
+      if(ct==='TS'){
+        h+=invV('solid');
+        const arY=sy+sH*0.88;
+        const goRight=(hcx<=sx+sW/2); // 핸들이 왼쪽 → 우방향 슬라이딩
+        if(goRight){
+          h+=`<line x1="${sx+sW*0.08}" y1="${arY}" x2="${sx+sW*0.86}" y2="${arY}" stroke="${dotCol}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
+          h+=`<polygon points="${sx+sW*0.86},${arY} ${sx+sW*0.74},${arY-4} ${sx+sW*0.74},${arY+4}" fill="${dotCol}" opacity="0.9"/>`;
+        } else {
+          h+=`<line x1="${sx+sW*0.92}" y1="${arY}" x2="${sx+sW*0.14}" y2="${arY}" stroke="${dotCol}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
+          h+=`<polygon points="${sx+sW*0.14},${arY} ${sx+sW*0.26},${arY-4} ${sx+sW*0.26},${arY+4}" fill="${dotCol}" opacity="0.9"/>`;
+        }
+      } else if(ct==='TT'||ct==='TTFIX'){
+        const isRight=hcx>sx+sW/2;
+        const hingeX=isRight?sx:sx+sW, handleX=isRight?sx+sW:sx, ph=sy+sH/2;
+        h+=`<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+        h+=`<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy+sH}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+        h+=`<circle cx="${handleX}" cy="${ph}" r="2.5" fill="${dotCol}" opacity="0.9"/>`;
+        h+=invV('solid');
+      } else if(ct==='TO'){
+        h+=invV('solid');
+      } else if(ct==='DOOR'){
+        const isRight=hcx>sx+sW/2;
+        const hingeX=isRight?sx:sx+sW, handleX=isRight?sx+sW:sx, ph=sy+sH/2;
+        h+=`<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+        h+=`<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy+sH}" stroke="${col}" stroke-width="${lw}" stroke-linecap="round" opacity="0.85"/>`;
+        h+=`<circle cx="${handleX}" cy="${ph}" r="2.5" fill="${dotCol}" opacity="0.9"/>`;
+      } else if(ct==='PROJ'){
+        const mx=sx+sW/2, botY=sy+sH, topY=sy;
+        h+=`<line x1="${mx}" y1="${botY}" x2="${sx}" y2="${topY}" stroke="${dashCol}" stroke-width="${lw}" stroke-dasharray="4 2" opacity="0.85"/>`;
+        h+=`<line x1="${mx}" y1="${botY}" x2="${sx+sW}" y2="${topY}" stroke="${dashCol}" stroke-width="${lw}" stroke-dasharray="4 2" opacity="0.85"/>`;
+        h+=`<circle cx="${mx}" cy="${botY}" r="2.5" fill="${dotCol}" opacity="0.9"/>`;
+      }
+      return h;
+    }
+
+    let out = '';
+
+    // ── 외곽 프레임 ──
+    out += `<rect x="${OX}" y="${OY}" width="${sw}" height="${sh}" fill="${FRAME_FILL}" stroke="${FRAME_STK}" stroke-width="2"/>`;
+
+    // ── 각 셀 그리기 ──
+    const cols = (wo.cols || 1);
+    const rows = (wo.rows || 1);
+    cells.forEach(cell => {
+      const cx = OX + cell.x0 * SC;
+      const cy = OY + cell.y0 * SC;
+      const cw = cell.cW * SC;
+      const ch = cell.cH * SC;
+      const ct = cell.ct;
+      const isFix = cell.isFix;
+
+      if(isFix){
+        // FIX 셀: 해치 패턴 (병합 셀이면 외곽선 강조)
+        const isMerged = (cell.colspan||1) > 1 || (cell.rowspan||1) > 1;
+        out += `<rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" fill="${FIX_FILL}" stroke="${FIX_STK}" stroke-width="${isMerged ? 2.2 : 0.8}"/>`;
+        const step = Math.max(8, cw/5);
+        for(let xi = cx - ch; xi < cx + cw + ch; xi += step){
+          const x1=Math.max(cx,xi), y1=xi>=cx?cy:cy+(cx-xi);
+          const x2=Math.min(cx+cw,xi+ch), y2=xi+ch<=cx+cw?cy+ch:cy+ch-(xi+ch-(cx+cw));
+          if(x1<x2) out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#8899aa" stroke-width="0.55"/>`;
+        }
+        if(cw > 20) out += `<text x="${cx+cw/2}" y="${cy+ch/2+3}" text-anchor="middle" font-size="9" fill="#334455" font-family="Arial,sans-serif" font-weight="700">${isMerged ? 'FIX(병합)' : 'FIX'}</text>`;
+      } else {
+        // 샤시 셀
+        out += `<rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" fill="${SASH_FILL}" stroke="${SASH_STK}" stroke-width="0.9"/>`;
+        const mg = fw * SC * 0.5;
+        if(cw > mg*2+4 && ch > mg*2+4){
+          out += `<rect x="${cx+mg}" y="${cy+mg}" width="${cw-mg*2}" height="${ch-mg*2}" fill="rgba(140,205,255,0.35)" stroke="#55aadd" stroke-width="0.5"/>`;
+        }
+
+        // ── 핸들 위치 계산 (메인 도면과 동일 로직) ──
+        let hcx, hcy, leverUp=false;
+        const hasMulRight = (cell.c !== undefined) ? cell.c < cols-1 : false;
+        const hasMulLeft  = (cell.c !== undefined) ? cell.c > 0 : false;
+        const hasMulBelow = (cell.r !== undefined) ? cell.r < rows-1 : false;
+        const hasMulAbove = (cell.r !== undefined) ? cell.r > 0 : false;
+        const hasMul = hasMulRight||hasMulLeft||hasMulBelow||hasMulAbove;
+
+        if(ct==='TS'){
+          let hPos;
+          if(item.baseType==='TSTS'){
+            const tsCells=cells.filter(c=>c.ct==='TS');
+            const tsIdx=tsCells.indexOf(cell);
+            hPos=(tsIdx===0)?'right':'left';
+          } else {
+            hPos=handlePos;
+          }
+          hcx = (hPos==='right') ? cx+cw-sc(5) : cx+sc(5);
+          hcy = (handleHeightLabel==='top') ? cy+ch/2-sc(120)
+              : (handleHeightLabel==='bottom') ? cy+ch/2+sc(120)
+              : cy+ch/2;
+        } else {
+          if(hasMul){
+            if(hasMulRight){
+              hcx=cx+cw-sc(5);
+              hcy=(handleHeightLabel==='top')?cy+ch/2-sc(120):(handleHeightLabel==='bottom')?cy+ch/2+sc(120):cy+ch/2;
+            } else if(hasMulLeft){
+              hcx=cx+sc(5);
+              hcy=(handleHeightLabel==='top')?cy+ch/2-sc(120):(handleHeightLabel==='bottom')?cy+ch/2+sc(120):cy+ch/2;
+            } else if(hasMulBelow){
+              hcx=cx+cw/2; hcy=cy+ch-sc(5); leverUp=true;
+            } else {
+              hcx=cx+cw/2; hcy=cy+sc(5);
+            }
+          } else {
+            if(handlePos==='left'){      hcx=cx+sc(5);      hcy=(handleHeightLabel==='top')?cy+ch/2-sc(120):(handleHeightLabel==='bottom')?cy+ch/2+sc(120):cy+ch/2; }
+            else if(handlePos==='right'){ hcx=cx+cw-sc(5);  hcy=(handleHeightLabel==='top')?cy+ch/2-sc(120):(handleHeightLabel==='bottom')?cy+ch/2+sc(120):cy+ch/2; }
+            else if(handlePos==='top'){   hcx=cx+cw/2; hcy=cy+sc(5); }
+            else { hcx=cx+cw/2; hcy=cy+ch-sc(5); leverUp=true; }
+          }
+        }
+
+        if(cw>20 && ch>30){
+          out += drawOpenDir(ct, cx, cy, cw, ch, hcx);
+          // DOOR + 디지털 도어락 모드 감지
+          const _isDigLock2 = (ct === 'DOOR') && !!(it.hasDigitalLock || (it.snapshot && it.snapshot.optDigitalLock) || (it.wo && it.wo.doorType === 'digital'));
+          out += drawHandle(hcx, hcy, ch, leverUp, _isDigLock2);
+        }
+      }
+    });
+
+    // ── 중간바 그리기 ──
+    // 수직 중간바: x0이 fw~W-fw 사이인 셀 경계 찾기
+    const vEdges = new Set();
+    const hEdges = new Set();
+    cells.forEach(cell=>{
+      const rx = cell.x0 + cell.cW;
+      const ry = cell.y0 + cell.cH;
+      if(rx > fw && rx < W - fw + 1) vEdges.add(Math.round(rx));
+      if(ry > fw && ry < H - fw + 1) hEdges.add(Math.round(ry));
+    });
+    vEdges.forEach(rx=>{
+      const x = OX + rx * SC;
+      out += `<line x1="${x}" y1="${OY + fw*SC}" x2="${x}" y2="${OY + sh - fw*SC}" stroke="${MUL_COL}" stroke-width="1.8"/>`;
+    });
+    hEdges.forEach(ry=>{
+      const y = OY + ry * SC;
+      out += `<line x1="${OX + fw*SC}" y1="${y}" x2="${OX + sw - fw*SC}" y2="${y}" stroke="${MUL_COL}" stroke-width="1.8"/>`;
+    });
+
+    // ── 프레임 두께 표시 (상단 좌우 + 좌측 상하) ──
+    const fwpx = fw * SC;
+    // 상단: 좌/우 프레임 두께
+    [[OX, OX+fwpx, OY-10, `${fw}`],[OX+sw-fwpx, OX+sw, OY-10, `${fw}`]].forEach(([x1,x2,y,lbl])=>{
+      out += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<line x1="${x1}" y1="${y-3}" x2="${x1}" y2="${y+3}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<line x1="${x2}" y1="${y-3}" x2="${x2}" y2="${y+3}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<text x="${(x1+x2)/2}" y="${y-4}" text-anchor="middle" font-size="${DIM_FONT}" fill="#e03030" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
+    });
+    // 좌측: 상/하 프레임 두께
+    [[OY, OY+fwpx, OX-12, `${fw}`],[OY+sh-fwpx, OY+sh, OX-12, `${fw}`]].forEach(([y1,y2,x,lbl])=>{
+      out += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<line x1="${x-3}" y1="${y1}" x2="${x+3}" y2="${y1}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<line x1="${x-3}" y1="${y2}" x2="${x+3}" y2="${y2}" stroke="#e03030" stroke-width="0.8"/>`;
+      out += `<text transform="rotate(-90,${x-5},${(y1+y2)/2})" x="${x-5}" y="${(y1+y2)/2+DIM_FONT*0.4}" text-anchor="middle" font-size="${DIM_FONT}" fill="#e03030" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
+    });
+
+    // ── 덧바 표시 ──
+    const adTop = wo.adTop || 0, adBot = wo.adBot || 0;
+    const adLeft = wo.adLeft || 0, adRight = wo.adRight || 0;
+    const AD_COL = '#cc4400', AD_FONT = DIM_FONT + 1;
+    if(adTop > 0){
+      out += `<rect x="${OX}" y="${OY-14}" width="${sw}" height="6" fill="rgba(220,100,0,0.18)" stroke="${AD_COL}" stroke-width="1.2"/>`;
+      out += `<text x="${OX+sw/2}" y="${OY-16}" text-anchor="middle" font-size="${AD_FONT}" fill="${AD_COL}" font-family="Arial,sans-serif" font-weight="700">상 덧바 ${adTop}mm</text>`;
+    }
+    if(adBot > 0){
+      const yb = OY + sh + 4;
+      out += `<rect x="${OX}" y="${yb}" width="${sw}" height="6" fill="rgba(220,100,0,0.18)" stroke="${AD_COL}" stroke-width="1.2"/>`;
+      out += `<text x="${OX+sw/2}" y="${yb+12}" text-anchor="middle" font-size="${AD_FONT}" fill="${AD_COL}" font-family="Arial,sans-serif" font-weight="700">하 덧바 ${adBot}mm</text>`;
+    }
+    if(adLeft > 0){
+      out += `<rect x="${OX-10}" y="${OY}" width="6" height="${sh}" fill="rgba(220,100,0,0.18)" stroke="${AD_COL}" stroke-width="1.2"/>`;
+      out += `<text transform="rotate(-90,${OX-18},${OY+sh/2})" x="${OX-18}" y="${OY+sh/2+AD_FONT*0.4}" text-anchor="middle" font-size="${AD_FONT}" fill="${AD_COL}" font-family="Arial,sans-serif" font-weight="700">좌 ${adLeft}</text>`;
+    }
+    if(adRight > 0){
+      out += `<rect x="${OX+sw+4}" y="${OY}" width="6" height="${sh}" fill="rgba(220,100,0,0.18)" stroke="${AD_COL}" stroke-width="1.2"/>`;
+      out += `<text transform="rotate(-90,${OX+sw+18},${OY+sh/2})" x="${OX+sw+18}" y="${OY+sh/2+AD_FONT*0.4}" text-anchor="middle" font-size="${AD_FONT}" fill="${AD_COL}" font-family="Arial,sans-serif" font-weight="700">우 ${adRight}</text>`;
+    }
+
+    // ── 수직 분할 치수선 (하단, row=0 셀들 가로 분할) ──
+    const cellsByRow0 = cells.filter(c=>c.r===0);
+    const hasHSplit = cellsByRow0.length > 1;
+    const DIM_STEP = DIM_FONT * 2.0;
+    if(hasHSplit){
+      const dimY = OY + sh + DIM_STEP;
+      cellsByRow0.slice().sort((a,b)=>a.x0-b.x0).forEach(cell=>{
+        const x1=OX+cell.x0*SC, x2=OX+(cell.x0+cell.cW)*SC, mx=(x1+x2)/2;
+        const lbl=String(Math.round(cell.cW));
+        const availW = Math.abs(x2-x1);
+        let fsize = DIM_FONT;
+        const estW = lbl.length * fsize * 0.6;
+        if(estW > availW*0.9 && availW>0) fsize = Math.max(12, Math.floor(availW*0.9/(lbl.length*0.6)));
+        const tw=lbl.length*fsize*0.6+2; const th=fsize+2;
+        out += `<line x1="${x1}" y1="${dimY}" x2="${x2}" y2="${dimY}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        out += `<line x1="${x1}" y1="${dimY-4}" x2="${x1}" y2="${dimY+4}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        out += `<line x1="${x2}" y1="${dimY-4}" x2="${x2}" y2="${dimY+4}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        out += `<rect x="${mx-tw/2}" y="${dimY-th-1}" width="${tw}" height="${th}" rx="1" fill="white" opacity="0.9"/>`;
+        out += `<text x="${mx}" y="${dimY-3}" text-anchor="middle" font-size="${fsize}" fill="${DIM_COL}" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
+      });
+    }
+
+    // ── 수평 분할 치수선 (우측, col=0 셀들 세로 분할) — 숫자 가로로 표시 ──
+    const cellsByCol0 = cells.filter(c=>c.c===0);
+    const hasVSplit = cellsByCol0.length > 1;
+    // 가로 숫자 표시를 위해 우측 공간을 넉넉히: 숫자 4자리 기준 ~24px
+    const vDimOffset = 18;
+    if(hasVSplit){
+      const dimX = OX + sw + vDimOffset;
+      cellsByCol0.slice().sort((a,b)=>a.y0-b.y0).forEach(cell=>{
+        const y1=OY+cell.y0*SC, y2=OY+(cell.y0+cell.cH)*SC, my=(y1+y2)/2;
+        const lbl=String(Math.round(cell.cH));
+        const tw=lbl.length*5+2; const th=DIM_FONT+2;
+        out += `<line x1="${dimX}" y1="${y1}" x2="${dimX}" y2="${y2}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        out += `<line x1="${dimX-4}" y1="${y1}" x2="${dimX+4}" y2="${y1}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        out += `<line x1="${dimX-4}" y1="${y2}" x2="${dimX+4}" y2="${y2}" stroke="${DIM_COL}" stroke-width="0.9"/>`;
+        // 숫자를 치수선 오른쪽에 가로로 표시
+        out += `<rect x="${dimX+5}" y="${my-th/2}" width="${tw}" height="${th}" rx="1" fill="white" opacity="0.9"/>`;
+        out += `<text x="${dimX+6}" y="${my+DIM_FONT*0.35}" text-anchor="start" font-size="${DIM_FONT}" fill="${DIM_COL}" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
+      });
+    }
+
+    // ── 전체 W 치수선 ──
+    const dimYbot = OY + sh + (hasHSplit ? DIM_STEP*2.4 : DIM_STEP);
+    const wLbl = String(W); const wTw = wLbl.length*6+4;
+    out += `<line x1="${OX}" y1="${dimYbot}" x2="${OX+sw}" y2="${dimYbot}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    out += `<line x1="${OX}" y1="${dimYbot-5}" x2="${OX}" y2="${dimYbot+5}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    out += `<line x1="${OX+sw}" y1="${dimYbot-5}" x2="${OX+sw}" y2="${dimYbot+5}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    out += `<rect x="${OX+sw/2-wTw/2}" y="${dimYbot-DIM_FONT-4}" width="${wTw}" height="${DIM_FONT+3}" rx="2" fill="white" opacity="0.9"/>`;
+    out += `<text x="${OX+sw/2}" y="${dimYbot-5}" text-anchor="middle" font-size="${DIM_FONT+1}" fill="${DIM_COL}" font-family="Arial,sans-serif" font-weight="900">${W}</text>`;
+
+    // ── 전체 H 치수선 (우측) — 숫자 가로로 표시 ──
+    const hLbl = String(H); const hTw = hLbl.length*6+4; const hTh = DIM_FONT+3;
+    const dimXr = OX + sw + (hasVSplit ? vDimOffset + hTw + 10 : vDimOffset + 8);
+    out += `<line x1="${dimXr}" y1="${OY}" x2="${dimXr}" y2="${OY+sh}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    out += `<line x1="${dimXr-5}" y1="${OY}" x2="${dimXr+5}" y2="${OY}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    out += `<line x1="${dimXr-5}" y1="${OY+sh}" x2="${dimXr+5}" y2="${OY+sh}" stroke="${DIM_COL}" stroke-width="1.2"/>`;
+    // 숫자를 치수선 오른쪽에 가로로, 세로 중간에 표시
+    out += `<rect x="${dimXr+5}" y="${OY+sh/2-hTh/2}" width="${hTw}" height="${hTh}" rx="2" fill="white" opacity="0.9"/>`;
+    out += `<text x="${dimXr+6}" y="${OY+sh/2+DIM_FONT*0.35}" text-anchor="start" font-size="${DIM_FONT+1}" fill="${DIM_COL}" font-family="Arial,sans-serif" font-weight="900">${H}</text>`;
+
+    const svgW = dimXr + hTw + 14;
+    const svgH = dimYbot + DIM_FONT + 14;
+    return `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto;max-width:${svgW}px;overflow:visible">${out}</svg>`;
+  }
 // 임가공 비용 정산 HTML
 function getBatchLaborCostHTML(){
   if(!orderItems.length) return '';
@@ -9091,7 +9389,7 @@ function getBatchLaborCostHTML(){
     grand += amount; totalQty += qty;
     const area = (((item.W||0)*(item.H||0))/1e6).toFixed(2);
     rowsHtml += `<tr style="background:${idx%2?'#f5fbfa':'#fff'}">
-      <td style="border:1px solid #cfe3df;padding:4px;text-align:center;width:190px">${laborMiniSVG(item)}</td>
+      <td style="border:1px solid #cfe3df;padding:4px;text-align:center;width:200px">${item.wo ? windowDiagramSVG(item, item.wo) : ''}</td>
       <td style="${tdC}">${idx+1}</td>
       <td style="${tdC}">${item.mark||'-'}</td>
       <td style="${tdC};font-weight:700;color:#0d5048">${laborTypeLabel(n)}</td>
