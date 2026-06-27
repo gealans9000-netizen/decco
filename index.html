@@ -7347,8 +7347,8 @@ function computeCost(W,H,g){
          const minMark = raw < 3 ? `→3평(최소)` : `${applied.toFixed(2)}평`;
          const typeTag = (!sameFix && fixCells.length>0) ? ` [${c.isFix?'FIX':'OPEN'}]` : '';
          return g.cells.length>1
-           ? `셀${i+1}${typeTag}(${Math.round(c.glassW)}×${Math.round(c.glassH)}): ${raw.toFixed(2)}평 ${minMark}`
-           : `${Math.round(c.glassW)}×${Math.round(c.glassH)}mm${typeTag}: ${raw.toFixed(2)}평 ${minMark}`;
+           ? `셀${i+1}${typeTag}(${rDim(c.glassW)}×${rDim(c.glassH)}): ${raw.toFixed(2)}평 ${minMark}`
+           : `${rDim(c.glassW)}×${rDim(c.glassH)}mm${typeTag}: ${raw.toFixed(2)}평 ${minMark}`;
        }).join(' / ');
        const priceStr = (!sameFix && fixCells.length>0)
          ? `OPEN ${openGlassPyeong.toFixed(2)}평×${fmt(glassUnitPrice())}/평 + FIX ${fixGlassPyeong.toFixed(2)}평×${fmt(glassUnitPriceFix())}/평`
@@ -7813,19 +7813,19 @@ function buildCutTable(W,H,g,ci){
   g.cells.forEach((c,i)=>{
     const gW=c.glassW, gH=c.glassH;
     const calcW=c.isFix
-      ? `${c.cW}−${c.lMW}−${c.rMW}−14`
-      : `${c.sW||0}−${effSpw}−${effSpw}−14`;
+      ? `${c.cW}−${c.lMW}−${c.rMW}−24`
+      : `${c.sW||0}−${effSpw}−${effSpw}−12`;
     const adT_=(c.r===0)?adTop:0, adB_=(c.r===g.rows-1)?adBot:0;
     const calcH=c.isFix
-      ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−14`
-      : `${c.sH||0}−${effSpw}−${effSpw}−14`;
-    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${Math.round(gW)}</td><td title="${calcH}">${Math.round(gH)}</td><td>${qty}</td></tr>`;
+      ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−24`
+      : `${c.sH||0}−${effSpw}−${effSpw}−12`;
+    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDim(gW)}</td><td title="${calcH}">${rDim(gH)}</td><td>${qty}</td></tr>`;
   });
 
   // ── GB 사이즈 (유리 + 14) ──
   h+=`<tr class="sh"><td colspan="4">🔲 GB 치수 (유리+14)</td></tr>`;
   g.cells.forEach((c,i)=>{
-    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${Math.round(c.glassW+(c.isFix?24:12))}</td><td>${Math.round(c.glassH+(c.isFix?24:12))}</td><td>${qty}</td></tr>`;
+    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${rDim(c.glassW+(c.isFix?24:12))}</td><td>${rDim(c.glassH+(c.isFix?24:12))}</td><td>${qty}</td></tr>`;
   });
 
   // ── 방충망 ──
@@ -8431,14 +8431,14 @@ function collectWorkOrderData(W, H, qty, g, ci){
       W: rDim(cutW), H: rDim(cutH),
       reinfW: Math.round((c.sW||0) - sReinfSub),
       reinfH: Math.round((c.sH||0) - sReinfSub),
-      glassW: Math.round(c.glassW), glassH: Math.round(c.glassH),
+      glassW: rDim(c.glassW), glassH: rDim(c.glassH),
       openW: Math.round(c.cW), openH: Math.round(c.cH),
     };
   });
 
   // ── FIX 셀 유리 ──
   const fixGlasses = g.cells.filter(c=>c.isFix).map((c,i)=>({
-    idx: i+1, glassW: Math.round(c.glassW), glassH: Math.round(c.glassH)
+    idx: i+1, glassW: rDim(c.glassW), glassH: rDim(c.glassH)
   }));
 
   // ── 중간바 절단 ──
