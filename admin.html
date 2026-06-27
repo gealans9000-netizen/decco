@@ -388,11 +388,11 @@ body {
           </div>
         </div>
         <div class="qc-buttons">
-          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba" target="_blank" class="qc-btn">🏠 프로젝트 홈</a>
-          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/auth/users" target="_blank" class="qc-btn">👥 사용자 관리</a>
-          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new" target="_blank" class="qc-btn">📝 SQL Editor</a>
-          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/editor" target="_blank" class="qc-btn">📋 Table Editor</a>
-          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/database/backups" target="_blank" class="qc-btn">💾 백업</a>
+          <a href="https://supabase.com/dashboard/project/zskipcozqvflspvtkegb" target="_blank" class="qc-btn">🏠 프로젝트 홈</a>
+          <a href="https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/auth/users" target="_blank" class="qc-btn">👥 사용자 관리</a>
+          <a href="https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/sql/new" target="_blank" class="qc-btn">📝 SQL Editor</a>
+          <a href="https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/editor" target="_blank" class="qc-btn">📋 Table Editor</a>
+          <a href="https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/database/backups" target="_blank" class="qc-btn">💾 백업</a>
         </div>
       </div>
 
@@ -451,8 +451,8 @@ body {
 // ────────────────────────────────────────────────
 // Supabase 설정
 // ────────────────────────────────────────────────
-const SUPABASE_URL = 'https://tpuiujcafcrvvybhrfba.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
+const SUPABASE_URL = 'https://zskipcozqvflspvtkegb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let _currentUser = null;
 let _currentProfile = null;
@@ -662,7 +662,7 @@ async function copySQL(templateName){
     showToast('✅ SQL이 클립보드에 복사되었습니다. SQL Editor에 붙여넣기(Ctrl+V) 하세요.', 'success');
     // SQL Editor 새 탭으로 자동 열기
     setTimeout(() => {
-      window.open('https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new', '_blank');
+      window.open('https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/sql/new', '_blank');
     }, 800);
   } catch(err) {
     // clipboard API 실패 시 대체 방법
@@ -676,7 +676,7 @@ async function copySQL(templateName){
       document.execCommand('copy');
       showToast('✅ SQL이 클립보드에 복사되었습니다.', 'success');
       setTimeout(() => {
-        window.open('https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new', '_blank');
+        window.open('https://supabase.com/dashboard/project/zskipcozqvflspvtkegb/sql/new', '_blank');
       }, 800);
     } catch(_) {
       showToast('복사 실패: ' + err.message, 'error');

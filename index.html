@@ -29,7 +29,7 @@
 html,body{height:100%;min-height:0;overflow:hidden}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;display:flex;flex-direction:column}
 #hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;z-index:200;flex-shrink:0;min-height:42px;box-shadow:0 1px 3px rgba(26,35,64,.05)}
-.logo-g{background:linear-gradient(135deg,#5b8def,#34d4b8);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.5px}.logo-t{font-size:14px;font-weight:600;margin-left:8px}.logo-s{font-size:10px;color:var(--text3);margin-left:6px}.hdr-btns{display:flex;gap:6px}
+.brand-logo{display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1;user-select:none}.decco-mark{font-family:'Arial Black','Arial',sans-serif;font-weight:900;font-size:20px;letter-spacing:-1.2px;color:#2b2a1c;line-height:.85}.decco-mark sup{font-size:9px;font-weight:700;top:-.65em;margin-left:1px}.decco-sub{font-size:6.5px;font-weight:700;letter-spacing:3px;color:#2b2a1c;margin-top:2px;padding-left:1px}.logo-t{font-size:14px;font-weight:600;margin-left:10px;color:var(--text)}.logo-s{font-size:10px;color:var(--text3);margin-left:6px}.hdr-btns{display:flex;gap:6px}
 #app{display:flex;flex:1;min-height:0;overflow:hidden}
 .tab-bar{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 12px;flex-shrink:0;overflow-x:auto}
 .tab{padding:7px 13px;font-size:11px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}.tab:hover{color:var(--text2)}.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
@@ -319,7 +319,7 @@ if(typeof pdfjsLib !== 'undefined'){
     const subStyle = 'color:#ff8800;font-size:14px;font-weight:600';
     const msgStyle = 'color:#aaa;font-size:12px';
     console.log('%c⚠ 경고 ⚠', warnStyle);
-    console.log('%c이 영역은 GEALAN S9000 시스템 개발자 전용입니다.', subStyle);
+    console.log('%c이 영역은 DECCO 시스템 개발자 전용입니다.', subStyle);
     console.log('%c여기에 코드를 붙여넣거나 명령을 실행하면 계정이 탈취되거나 시스템이 손상될 수 있습니다.', msgStyle);
     console.log('%c누군가가 "이 코드를 실행하면 무료 기능을 줍니다" 같은 말로 권유했다면 100% 사기입니다.', msgStyle);
   }, 1000);
@@ -361,8 +361,8 @@ if(typeof pdfjsLib !== 'undefined'){
 
 <!-- 인증 가드: 로그인 안 했으면 로그인 페이지로 리디렉트 -->
 <script>
-window.SUPABASE_URL = 'https://tpuiujcafcrvvybhrfba.supabase.co';
-window.SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
+window.SUPABASE_URL = 'https://zskipcozqvflspvtkegb.supabase.co';
+window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
 // 페이지 렌더링 시작 전에 즉시 인증 체크 (HTML 본체 로드 전 차단)
 (function(){
   // body 보이기 전 임시 차단 스타일
@@ -373,8 +373,8 @@ window.SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
 <body>
 <div id="hdr">
   <div style="display:flex;align-items:center;gap:10px">
-    <span class="logo-g">GEALAN</span>
-    <span class="logo-t">S9000 창호 설계·견적 시스템</span>
+    <div class="brand-logo"><span class="decco-mark">decco<sup>®</sup></span><span class="decco-sub">EXTRUSION</span></div>
+    <span class="logo-t">창호 설계·견적 시스템</span>
     <span class="logo-s">v35 — 항목별 % 단가 조정</span>
   </div>
   <div class="hdr-btns"><span id="autosave-badge" style="font-size: 9px; color: var(--text3); margin-right: 4px; white-space: nowrap;">🔄 자동저장 21:06</span>
@@ -388,7 +388,7 @@ window.SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
     <button class="btn btn-sm" style="background:rgba(155,114,245,.12);color:var(--purple);border:1px solid rgba(155,114,245,.3)" onclick="document.getElementById(&#39;file-load-input&#39;).click()" title="저장된 현장 파일 불러오기">📂 파일에서</button>
     <input type="file" id="file-load-input" accept=".json" style="display:none" onchange="loadProject(event)">
     <button class="btn btn-sm" style="background:rgba(245,166,35,.12);color:#f5a623;border:1px solid rgba(245,166,35,.3)" onclick="window.open('https://winkhaus-bom-calculator.vercel.app/', 'winkhaus_bom', 'noopener')" title="Winkhaus 하드웨어 BOM 계산기 (새 창)">🔧 하드웨어 BOM</button>
-    <button class="btn btn-sm" style="background:rgba(19,65,62,.12);color:#176B66;border:1px solid rgba(23,107,102,.4)" onclick="window.open('https://inventory-nine-vert.vercel.app/', 'gealan_inventory', 'noopener')" title="S9000 재고관리 (새 창)">📦 재고관리</button>
+    <button class="btn btn-sm" style="background:rgba(19,65,62,.12);color:#176B66;border:1px solid rgba(23,107,102,.4)" onclick="window.open('https://inventory-nine-vert.vercel.app/', 'gealan_inventory', 'noopener')" title="재고관리 (새 창)">📦 재고관리</button>
     <div class="auth-info" id="auth-info" style="display:none;margin-left:8px;position:relative">
       <div class="auth-user">
         <span class="auth-name" id="auth-name">—</span>
@@ -3115,7 +3115,7 @@ function openBulkEditWindow(){
   window._bulkEditWin = w;
 
   w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-<title>GEALAN 일괄 편집 — 창호 ${orderItems.length}개</title>
+<title>DECCO 일괄 편집 — 창호 ${orderItems.length}개</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f5f7fb;color:#1a2340;font-size:12px;padding:14px}
@@ -3162,7 +3162,7 @@ tbody input:focus,tbody select:focus{border-color:#3b6fd9;outline:2px solid rgba
 </head><body>
 
 <h1>🪟 창호 목록 일괄 편집</h1>
-<p class="sub" id="sub-info">GEALAN S9000 | 전체 <span id="total-count">${orderItems.length}</span>개 창호</p>
+<p class="sub" id="sub-info">DECCO 창호 | 전체 <span id="total-count">${orderItems.length}</span>개 창호</p>
 
 <!-- 전체 일괄 적용 영역 -->
 <div class="bulk-bar">
