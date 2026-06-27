@@ -9250,42 +9250,6 @@ function laborTypeLabel(n){
       }
     });
 
-    // ── 중간바 그리기 ──
-    // 수직 중간바: x0이 fw~W-fw 사이인 셀 경계 찾기
-    const vEdges = new Set();
-    const hEdges = new Set();
-    cells.forEach(cell=>{
-      const rx = cell.x0 + cell.cW;
-      const ry = cell.y0 + cell.cH;
-      if(rx > fw && rx < W - fw + 1) vEdges.add(Math.round(rx));
-      if(ry > fw && ry < H - fw + 1) hEdges.add(Math.round(ry));
-    });
-    vEdges.forEach(rx=>{
-      const x = OX + rx * SC;
-      out += `<line x1="${x}" y1="${OY + fw*SC}" x2="${x}" y2="${OY + sh - fw*SC}" stroke="${MUL_COL}" stroke-width="1.8"/>`;
-    });
-    hEdges.forEach(ry=>{
-      const y = OY + ry * SC;
-      out += `<line x1="${OX + fw*SC}" y1="${y}" x2="${OX + sw - fw*SC}" y2="${y}" stroke="${MUL_COL}" stroke-width="1.8"/>`;
-    });
-
-    // ── 프레임 두께 표시 (상단 좌우 + 좌측 상하) ──
-    const fwpx = fw * SC;
-    // 상단: 좌/우 프레임 두께
-    [[OX, OX+fwpx, OY-10, `${fw}`],[OX+sw-fwpx, OX+sw, OY-10, `${fw}`]].forEach(([x1,x2,y,lbl])=>{
-      out += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<line x1="${x1}" y1="${y-3}" x2="${x1}" y2="${y+3}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<line x1="${x2}" y1="${y-3}" x2="${x2}" y2="${y+3}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<text x="${(x1+x2)/2}" y="${y-4}" text-anchor="middle" font-size="${DIM_FONT}" fill="#e03030" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
-    });
-    // 좌측: 상/하 프레임 두께
-    [[OY, OY+fwpx, OX-12, `${fw}`],[OY+sh-fwpx, OY+sh, OX-12, `${fw}`]].forEach(([y1,y2,x,lbl])=>{
-      out += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<line x1="${x-3}" y1="${y1}" x2="${x+3}" y2="${y1}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<line x1="${x-3}" y1="${y2}" x2="${x+3}" y2="${y2}" stroke="#e03030" stroke-width="0.8"/>`;
-      out += `<text transform="rotate(-90,${x-5},${(y1+y2)/2})" x="${x-5}" y="${(y1+y2)/2+DIM_FONT*0.4}" text-anchor="middle" font-size="${DIM_FONT}" fill="#e03030" font-family="Arial,sans-serif" font-weight="700">${lbl}</text>`;
-    });
-
     // ── 덧바 표시 ──
     const adTop = wo.adTop || 0, adBot = wo.adBot || 0;
     const adLeft = wo.adLeft || 0, adRight = wo.adRight || 0;
@@ -9425,6 +9389,10 @@ function getBatchLaborCostHTML(){
       <tfoot><tr style="background:#0d7a6f;color:#fff;font-weight:900">
         <td colspan="9" style="border:1px solid #0d7a6f;padding:8px;text-align:right">합계 (VAT 별도)</td>
         <td style="border:1px solid #0d7a6f;padding:8px;text-align:right;font-family:monospace">${fmt(grand)}</td>
+      </tr>
+      <tr style="background:#0a5c54;color:#fff;font-weight:900">
+        <td colspan="9" style="border:1px solid #0a5c54;padding:8px;text-align:right">합계 (VAT 포함)</td>
+        <td style="border:1px solid #0a5c54;padding:8px;text-align:right;font-family:monospace">${fmt(Math.round(grand*1.1))}</td>
       </tr></tfoot>
     </table>
     <div style="margin-top:8px;font-size:10px;color:#888;line-height:1.6">
