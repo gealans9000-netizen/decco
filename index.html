@@ -9244,7 +9244,7 @@ function laborTypeLabel(n){
         if(cw>20 && ch>30){
           out += drawOpenDir(ct, cx, cy, cw, ch, hcx);
           // DOOR + 디지털 도어락 모드 감지
-          const _isDigLock2 = (ct === 'DOOR') && !!(it.hasDigitalLock || (it.snapshot && it.snapshot.optDigitalLock) || (it.wo && it.wo.doorType === 'digital'));
+          const _isDigLock2 = (ct === 'DOOR') && !!(item.hasDigitalLock || (item.snapshot && item.snapshot.optDigitalLock) || (item.wo && item.wo.doorType === 'digital'));
           out += drawHandle(hcx, hcy, ch, leverUp, _isDigLock2);
         }
       }
