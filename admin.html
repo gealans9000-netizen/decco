@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEALAN S9000 — 관리자 페이지</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg1: #0e1016;
+  --bg2: #161922;
+  --bg3: #1d2130;
+  --bg4: #252a3d;
+  --text: #e8ecf1;
+  --text2: #b0b8c5;
+  --text3: #7a849a;
+  --border: #2c3142;
+  --border2: #3d4358;
+  --accent: #5b8def;
+  --green: #3ecf82;
+  --orange: #f5a623;
+  --red: #d84545;
+  --purple: #9b72f5;
+  --r2: 6px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+  background: var(--bg1);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 24px 32px;
+}
+.hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 22px;
+}
+.hdr-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-g {
+  background: linear-gradient(135deg, #5b8def 0%, #3ecf82 100%);
+  color: white;
+  padding: 4px 11px;
+  border-radius: 5px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sub {
+  font-size: 11px;
+  color: var(--text3);
+}
+.btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 7px 14px;
+  border-radius: var(--r2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 600;
+}
+.btn:hover { background: var(--bg4); color: var(--text); }
+.btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+.btn-primary:hover { background: #4a7ad9; }
+.btn-back { background: var(--bg3); }
+.section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.user-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.user-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+}
+.user-table tr:hover td {
+  background: rgba(91, 141, 239, 0.04);
+}
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.role-admin { background: rgba(62, 207, 130, 0.15); color: var(--green); }
+.role-manager { background: rgba(245, 166, 35, 0.15); color: var(--orange); }
+.role-user { background: rgba(122, 132, 154, 0.15); color: var(--text3); }
+.role-select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.role-select:focus { outline: none; border-color: var(--accent); }
+.access-denied {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--red);
+}
+.access-denied h2 { font-size: 22px; margin-bottom: 10px; }
+.access-denied p { color: var(--text3); font-size: 13px; }
+.empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text3);
+  font-size: 12px;
+}
+.loading {
+  text-align: center;
+  padding: 30px;
+  color: var(--text3);
+  font-size: 12px;
+}
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.toast.success { border-color: var(--green); color: var(--green); }
+.toast.error { border-color: var(--red); color: var(--red); }
+.stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  flex: 1;
+}
+.stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+/* 빠른 링크 카드 */
+.quick-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  transition: all 0.18s;
+}
+.quick-card:hover {
+  border-color: var(--border2);
+  background: var(--bg4);
+}
+.qc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.qc-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.qc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.qc-sub {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+.qc-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.qc-btn {
+  display: block;
+  padding: 7px 11px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.13s;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+.qc-btn:hover {
+  background: rgba(91, 141, 239, 0.10);
+  color: var(--accent);
+  border-color: rgba(91, 141, 239, 0.4);
+  transform: translateX(2px);
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- admin 전용 페이지: 보안 차단 없음 (admin은 디버깅 가능해야 함) -->
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <span class="logo-g">GEALAN</span>
+    <div>
+      <div class="title">🛠 관리자 페이지</div>
+      <div class="sub">사용자 및 권한 관리</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-back" onclick="window.location.href='index.html'">← 메인으로</button>
+    <button class="btn" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<!-- 권한 없음 화면 (admin이 아닌 경우) -->
+<div id="access-denied" style="display:none">
+  <div class="section access-denied">
+    <h2>🔒 접근 권한 없음</h2>
+    <p>이 페이지는 관리자(admin)만 접근할 수 있습니다.</p>
+    <p style="margin-top:14px"><a href="index.html" style="color:var(--accent)">메인 페이지로 돌아가기</a></p>
+  </div>
+</div>
+
+<!-- 메인 콘텐츠 (admin 전용) -->
+<div id="admin-content" style="display:none">
+  <!-- 통계 카드 -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-label">전체 사용자</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-admin">—</div>
+      <div class="stat-label">관리자 (admin)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-manager">—</div>
+      <div class="stat-label">실장 (manager)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-user">—</div>
+      <div class="stat-label">사용자 (user)</div>
+    </div>
+  </div>
+
+  <!-- 사용자 목록 -->
+  <div class="section">
+    <div class="section-title">
+      👥 사용자 목록
+      <span style="font-weight:400;color:var(--text3);font-size:11px;margin-left:auto">역할을 변경하려면 드롭다운을 사용하세요</span>
+    </div>
+    <div id="users-area">
+      <div class="loading">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- 빠른 링크 섹션 -->
+  <div class="section">
+    <div class="section-title">
+      🔗 빠른 링크 — 관리 도구 바로가기
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">
+
+      <!-- GitHub 카드 -->
+      <div class="quick-card">
+        <div class="qc-header">
+          <div class="qc-icon" style="background:linear-gradient(135deg,#24292e,#586069)">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          </div>
+          <div>
+            <div class="qc-title">GitHub 저장소</div>
+            <div class="qc-sub">코드 파일 보기/수정</div>
+          </div>
+        </div>
+        <div class="qc-buttons">
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager" target="_blank" class="qc-btn">📁 저장소 메인</a>
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager/upload/main" target="_blank" class="qc-btn">📤 파일 업로드</a>
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager/edit/main/index.html" target="_blank" class="qc-btn">✏ index.html 편집</a>
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager/edit/main/login.html" target="_blank" class="qc-btn">✏ login.html 편집</a>
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager/edit/main/admin.html" target="_blank" class="qc-btn">✏ admin.html 편집</a>
+          <a href="https://github.com/gealans9000-netizen/Gealans9000-Manager/commits/main" target="_blank" class="qc-btn">📜 변경 이력</a>
+        </div>
+      </div>
+
+      <!-- Vercel 카드 -->
+      <div class="quick-card">
+        <div class="qc-header">
+          <div class="qc-icon" style="background:linear-gradient(135deg,#000,#444)">
+            <svg width="18" height="18" viewBox="0 0 76 65" fill="white"><path d="M37.59.25l36.95 64H.64l36.95-64z"/></svg>
+          </div>
+          <div>
+            <div class="qc-title">Vercel 배포</div>
+            <div class="qc-sub">사이트 호스팅 / 배포 상태</div>
+          </div>
+        </div>
+        <div class="qc-buttons">
+          <a href="https://vercel.com/dashboard" target="_blank" class="qc-btn">📊 대시보드</a>
+          <a href="https://gealans9000-manager.vercel.app/login.html" target="_blank" class="qc-btn">🌐 사이트 (로그인)</a>
+        </div>
+      </div>
+
+      <!-- Supabase 카드 -->
+      <div class="quick-card">
+        <div class="qc-header">
+          <div class="qc-icon" style="background:linear-gradient(135deg,#3ecf8e,#1f8e5f)">
+            <svg width="18" height="18" viewBox="0 0 109 113" fill="white"><path d="M63.7 110.83c-2.85 3.59-8.63 1.62-8.69-2.96l-.85-66.92h45c8.15 0 12.7 9.4 7.65 15.78l-43.11 54.1z" opacity="0.8"/><path d="M45.32 2.15c2.85-3.59 8.63-1.62 8.69 2.96l.37 66.92h-44.5c-8.15 0-12.7-9.4-7.65-15.78L45.32 2.15z"/></svg>
+          </div>
+          <div>
+            <div class="qc-title">Supabase</div>
+            <div class="qc-sub">데이터베이스 / 인증 관리</div>
+          </div>
+        </div>
+        <div class="qc-buttons">
+          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba" target="_blank" class="qc-btn">🏠 프로젝트 홈</a>
+          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/auth/users" target="_blank" class="qc-btn">👥 사용자 관리</a>
+          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new" target="_blank" class="qc-btn">📝 SQL Editor</a>
+          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/editor" target="_blank" class="qc-btn">📋 Table Editor</a>
+          <a href="https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/database/backups" target="_blank" class="qc-btn">💾 백업</a>
+        </div>
+      </div>
+
+      <!-- 자주 쓰는 SQL 카드 -->
+      <div class="quick-card">
+        <div class="qc-header">
+          <div class="qc-icon" style="background:linear-gradient(135deg,#9b72f5,#6c4ad9)">
+            <span style="font-size:14px">⚡</span>
+          </div>
+          <div>
+            <div class="qc-title">자주 쓰는 SQL</div>
+            <div class="qc-sub">클릭하면 복사됨</div>
+          </div>
+        </div>
+        <div class="qc-buttons">
+          <button class="qc-btn" onclick="copySQL('list-users')">📋 사용자 목록 조회</button>
+          <button class="qc-btn" onclick="copySQL('reset-password')">🔐 비밀번호 재설정</button>
+          <button class="qc-btn" onclick="copySQL('change-role')">🎖 역할 변경</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 코드 업데이트 가이드 -->
+  <div class="section" style="background:rgba(91,141,239,0.04)">
+    <div class="section-title">📝 코드 업데이트 가이드</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.8">
+      <p><b>새 코드 받았을 때 업데이트 순서:</b></p>
+      <ol style="margin-left:18px;margin-top:8px">
+        <li>위 <b>"📤 파일 업로드"</b> 버튼 클릭 → GitHub Upload 페이지 열림</li>
+        <li>새 파일을 끌어다 놓기 (또는 "choose your files")</li>
+        <li>화면 아래로 스크롤 → <b>"Commit changes"</b> 클릭</li>
+        <li>1~2분 대기 (Vercel 자동 재배포)</li>
+        <li>사이트에서 <b>Ctrl + Shift + R</b> (강제 새로고침)으로 확인</li>
+      </ol>
+      <p style="margin-top:10px;color:var(--text3);font-size:11px">💡 작은 수정이라면 "✏ 편집" 버튼으로 GitHub에서 직접 코드 수정도 가능합니다.</p>
+    </div>
+  </div>
+
+  <!-- 안내 -->
+  <div class="section" style="background:rgba(91,141,239,0.04)">
+    <div class="section-title">ℹ 안내</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7">
+      <p>• <b>역할 변경</b>: 드롭다운으로 즉시 변경됩니다 (재로그인 필요).</p>
+      <p>• <b>새 사용자 추가 / 사용자 삭제</b>: 위 "👥 사용자 관리" 클릭하면 Supabase에서 처리.</p>
+      <p>• <b>본인 비밀번호 변경</b>은 메인 화면 우측 상단 ⚙ → "비밀번호 변경"을 사용하세요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div id="toast" class="toast">메시지</div>
+
+<script>
+// ────────────────────────────────────────────────
+// Supabase 설정
+// ────────────────────────────────────────────────
+const SUPABASE_URL = 'https://tpuiujcafcrvvybhrfba.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let _currentUser = null;
+let _currentProfile = null;
+
+// ────────────────────────────────────────────────
+// 토스트
+// ────────────────────────────────────────────────
+function showToast(msg, type='info'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(()=>{ t.classList.remove('show'); }, 2500);
+}
+
+// ────────────────────────────────────────────────
+// 인증 체크 + admin 권한 검증
+// ────────────────────────────────────────────────
+async function init(){
+  // 1) 세션 확인
+  const { data: { session } } = await sbClient.auth.getSession();
+  if(!session){
+    window.location.href = 'login.html';
+    return;
+  }
+  _currentUser = session.user;
+
+  // 2) 프로필(역할) 조회
+  const { data: profile, error } = await sbClient
+    .from('profiles')
+    .select('id, email, name, role')
+    .eq('id', session.user.id)
+    .single();
+  if(error || !profile){
+    showAccessDenied();
+    return;
+  }
+  _currentProfile = profile;
+
+  // admin 이메일 목록 (메인과 동기화)
+  const ADMIN_EMAILS = [
+    'gealans9000@gmail.com',
+    'ingram77@naver.com'
+  ];
+  const userEmail = (session.user.email || '').toLowerCase();
+  const isAdminByEmail = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(userEmail);
+  const isAdminByRole = profile.role === 'admin';
+
+  // 3) admin이 아니면 차단 (이메일 또는 role 둘 중 하나라도 admin이면 통과)
+  if(!isAdminByEmail && !isAdminByRole){
+    showAccessDenied();
+    return;
+  }
+  // 강제 admin role 적용 (이메일 기반)
+  if(isAdminByEmail) _currentProfile.role = 'admin';
+
+  // 4) 관리자 콘텐츠 표시
+  document.getElementById('admin-content').style.display = 'block';
+
+  // 5) 사용자 목록 로드
+  await loadUsers();
+}
+
+function showAccessDenied(){
+  document.getElementById('access-denied').style.display = 'block';
+}
+
+// ────────────────────────────────────────────────
+// 사용자 목록 로드
+// ────────────────────────────────────────────────
+async function loadUsers(){
+  const area = document.getElementById('users-area');
+  area.innerHTML = '<div class="loading">로딩 중...</div>';
+
+  const { data: users, error } = await sbClient
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if(error){
+    area.innerHTML = '<div class="empty">사용자 목록을 불러올 수 없습니다: ' + error.message + '</div>';
+    return;
+  }
+
+  if(!users || !users.length){
+    area.innerHTML = '<div class="empty">등록된 사용자가 없습니다.</div>';
+    return;
+  }
+
+  // 통계
+  const stats = {admin:0, manager:0, user:0};
+  users.forEach(u => { if(stats[u.role] !== undefined) stats[u.role]++; });
+  document.getElementById('stat-total').textContent = users.length;
+  document.getElementById('stat-admin').textContent = stats.admin;
+  document.getElementById('stat-manager').textContent = stats.manager;
+  document.getElementById('stat-user').textContent = stats.user;
+
+  // 테이블
+  let html = '<table class="user-table"><thead><tr>';
+  html += '<th>이메일</th><th>이름</th><th>역할</th><th>가입일</th>';
+  html += '</tr></thead><tbody>';
+
+  users.forEach(u => {
+    const isMe = u.id === _currentUser.id;
+    const dateStr = u.created_at ? new Date(u.created_at).toLocaleDateString('ko-KR') : '-';
+    html += `<tr>
+      <td>${escapeHtml(u.email||'')}${isMe ? ' <span style="color:var(--text3);font-size:10px">(나)</span>' : ''}</td>
+      <td>${escapeHtml(u.name||'-')}</td>
+      <td>
+        <select class="role-select" onchange="changeRole('${u.id}', this.value, this)" ${isMe ? 'disabled title="본인의 역할은 변경할 수 없습니다"' : ''}>
+          <option value="admin" ${u.role==='admin'?'selected':''}>admin (관리자)</option>
+          <option value="manager" ${u.role==='manager'?'selected':''}>manager (실장)</option>
+          <option value="user" ${u.role==='user'?'selected':''}>user (사용자)</option>
+        </select>
+      </td>
+      <td style="color:var(--text3);font-family:'DM Mono',monospace">${dateStr}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+}
+
+// ────────────────────────────────────────────────
+// 역할 변경
+// ────────────────────────────────────────────────
+async function changeRole(userId, newRole, selectEl){
+  const oldRole = selectEl.dataset.prev || '';
+  selectEl.dataset.prev = newRole;
+  selectEl.disabled = true;
+
+  const { error } = await sbClient
+    .from('profiles')
+    .update({ role: newRole })
+    .eq('id', userId);
+
+  selectEl.disabled = false;
+
+  if(error){
+    showToast('변경 실패: ' + error.message, 'error');
+    // 원복
+    if(oldRole) selectEl.value = oldRole;
+    return;
+  }
+
+  showToast(`✅ 역할이 "${newRole}"로 변경되었습니다.`, 'success');
+  // 통계 갱신
+  await loadUsers();
+}
+
+// ────────────────────────────────────────────────
+// 로그아웃
+// ────────────────────────────────────────────────
+async function logout(){
+  if(!confirm('로그아웃하시겠습니까?')) return;
+  await sbClient.auth.signOut();
+  window.location.href = 'login.html';
+}
+
+// ────────────────────────────────────────────────
+// 헬퍼
+// ────────────────────────────────────────────────
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ────────────────────────────────────────────────
+// 자주 쓰는 SQL 복사
+// ────────────────────────────────────────────────
+const SQL_TEMPLATES = {
+  'list-users': `-- 모든 사용자 목록 조회
+select email, name, role, created_at
+from public.profiles
+order by created_at;`,
+
+  'reset-password': `-- 사용자 비밀번호 재설정
+-- ⚠ 'user@example.com' 부분을 실제 이메일로 변경
+-- ⚠ '새비밀번호' 부분을 실제 비밀번호로 변경
+
+update auth.users
+set encrypted_password = crypt('새비밀번호', gen_salt('bf'))
+where email = 'user@example.com';
+
+select email, updated_at from auth.users
+where email = 'user@example.com';`,
+
+  'change-role': `-- 사용자 역할 변경
+-- ⚠ 이메일과 새 역할을 실제 값으로 변경
+-- 역할: 'admin', 'manager', 'user' 중 하나
+
+update public.profiles
+set role = 'manager',
+    name = '실제이름'
+where email = 'user@example.com';
+
+select email, name, role from public.profiles
+order by created_at;`
+};
+
+async function copySQL(templateName){
+  const sql = SQL_TEMPLATES[templateName];
+  if(!sql){
+    showToast('SQL 템플릿을 찾을 수 없습니다.', 'error');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(sql);
+    showToast('✅ SQL이 클립보드에 복사되었습니다. SQL Editor에 붙여넣기(Ctrl+V) 하세요.', 'success');
+    // SQL Editor 새 탭으로 자동 열기
+    setTimeout(() => {
+      window.open('https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new', '_blank');
+    }, 800);
+  } catch(err) {
+    // clipboard API 실패 시 대체 방법
+    const textarea = document.createElement('textarea');
+    textarea.value = sql;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showToast('✅ SQL이 클립보드에 복사되었습니다.', 'success');
+      setTimeout(() => {
+        window.open('https://supabase.com/dashboard/project/tpuiujcafcrvvybhrfba/sql/new', '_blank');
+      }, 800);
+    } catch(_) {
+      showToast('복사 실패: ' + err.message, 'error');
+    }
+    document.body.removeChild(textarea);
+  }
+}
+
+// 시작
+init();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEALAN S9000 — 로그인</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+  background: linear-gradient(135deg, #1a1f2e 0%, #2a3447 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #e8ecf1;
+}
+.login-card {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 40px 35px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.brand {
+  text-align: center;
+  margin-bottom: 30px;
+}
+.brand-logo {
+  display: inline-block;
+  background: linear-gradient(135deg, #5b8def 0%, #3ecf82 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8ecf1;
+  margin-bottom: 4px;
+}
+.brand-sub {
+  font-size: 12px;
+  color: #8a92a3;
+}
+.field {
+  margin-bottom: 16px;
+}
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a92a3;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.field-input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 14px;
+  color: #e8ecf1;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.field-input:focus {
+  border-color: #5b8def;
+  background: rgba(255,255,255,0.08);
+}
+.field-input::placeholder {
+  color: #5a6273;
+}
+.btn-login {
+  width: 100%;
+  background: linear-gradient(135deg, #5b8def 0%, #4a7ad9 100%);
+  border: none;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-login:hover { opacity: 0.92; }
+.btn-login:active { transform: translateY(1px); }
+.btn-login:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.error-msg {
+  background: rgba(239,83,80,0.12);
+  border: 1px solid rgba(239,83,80,0.3);
+  color: #ff7a76;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 14px;
+  display: none;
+}
+.error-msg.show { display: block; }
+.footer {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 11px;
+  color: #5a6273;
+}
+.loading {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="brand">
+    <div class="brand-logo">GEALAN</div>
+    <div class="brand-title">S9000 창호 설계·견적 시스템</div>
+    <div class="brand-sub">로그인하여 계속하기</div>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <form id="login-form">
+    <div class="field">
+      <label class="field-label" for="email">이메일</label>
+      <input type="email" id="email" class="field-input" placeholder="user@company.com" required autocomplete="email">
+    </div>
+    <div class="field">
+      <label class="field-label" for="password">비밀번호</label>
+      <input type="password" id="password" class="field-input" placeholder="••••••••" required autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn-login" id="btn-login">로그인</button>
+  </form>
+
+  <div class="footer">
+    © GEALAN S9000 Manager · 권한이 있는 사용자만 접근 가능
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 보안: 우클릭/F12/소스보기 차단 -->
+<script>
+(function(){
+  'use strict';
+  const isDevMode = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:';
+  if(isDevMode) return;
+  document.addEventListener('contextmenu', e => e.preventDefault(), true);
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
+    if(e.ctrlKey && e.shiftKey && /[IiJjCc]/.test(e.key)) { e.preventDefault(); return false; }
+    if(e.ctrlKey && /[UuSs]/.test(e.key) && !e.shiftKey && !e.altKey) { e.preventDefault(); return false; }
+  }, true);
+  setTimeout(function(){
+    console.log('%c⚠ 경고 ⚠', 'color:#ff3030;font-size:28px;font-weight:bold');
+    console.log('%cGEALAN S9000 시스템 — 인가된 사용자만 접근 가능합니다.', 'color:#ff8800;font-size:13px');
+  }, 500);
+})();
+</script>
+
+<script>
+// ────────────────────────────────────────────────
+// Supabase 설정
+// ────────────────────────────────────────────────
+const SUPABASE_URL = 'https://tpuiujcafcrvvybhrfba.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_axuR4cLqvhYmpFYoXPHsfg_qgJb7QIy';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ────────────────────────────────────────────────
+// 이미 로그인된 상태면 메인으로 자동 이동
+// ────────────────────────────────────────────────
+(async () => {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (session) {
+    window.location.href = 'index.html';
+  }
+})();
+
+// ────────────────────────────────────────────────
+// 로그인 처리
+// ────────────────────────────────────────────────
+const form = document.getElementById('login-form');
+const errorMsg = document.getElementById('error-msg');
+const btnLogin = document.getElementById('btn-login');
+
+function showError(msg) {
+  errorMsg.textContent = msg;
+  errorMsg.classList.add('show');
+}
+function hideError() {
+  errorMsg.classList.remove('show');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideError();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!email || !password) {
+    showError('이메일과 비밀번호를 입력해주세요.');
+    return;
+  }
+
+  btnLogin.disabled = true;
+  btnLogin.innerHTML = '<span class="loading"></span>로그인 중...';
+
+  try {
+    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      // 에러 메시지 한글화
+      let msg = '로그인 실패';
+      if (error.message.includes('Invalid login credentials')) {
+        msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+      } else if (error.message.includes('Email not confirmed')) {
+        msg = '이메일 인증이 완료되지 않았습니다. 관리자에게 문의하세요.';
+      } else {
+        msg = error.message;
+      }
+      showError(msg);
+      btnLogin.disabled = false;
+      btnLogin.textContent = '로그인';
+      return;
+    }
+
+    // 로그인 성공 → 메인으로
+    window.location.href = 'index.html';
+
+  } catch (err) {
+    showError('네트워크 오류: ' + err.message);
+    btnLogin.disabled = false;
+    btnLogin.textContent = '로그인';
+  }
+});
+
+// 엔터 키로도 제출
+document.getElementById('password').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') form.dispatchEvent(new Event('submit'));
+});
+</script>
+
+</body>
+</html>
