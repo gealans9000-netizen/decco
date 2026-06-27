@@ -2270,6 +2270,8 @@ function clearAllTypedPresets(){
 // ────────────────────────────────────────────────
 function P(id){return parseFloat(document.getElementById('p-'+id)?.value)||0}
 function PW(id){return parseFloat(document.getElementById('pw-'+id)?.value)||0}
+/* 치수(mm) 전용: 끝자리 0.5는 내림 (절단 치수가 0.5 작아야 조립·작동에 유리) — 예 550.5→550 */
+function rDim(x){return Math.ceil(x-0.5);}
 /* 표시명 매핑: 내부코드→데코 표기 (계산엔 영향 없음, 화면 표시만) */
 const DNAME={F70:'F72',F84:'F90',M92:'M99',M64:'M81',M108:'M99+',S82:'S78',S89:'S81',S108:'S106'};
 function dn(x){return (DNAME&&DNAME[x])||x;}
@@ -2413,7 +2415,7 @@ function computeVMulCut(i, g){
     const topDesc = (seg.firstR===0||vPrimary) ? `F(${fw})` : (topUseH ? `${topMT}/2(${topBnd})` : `F(${fw})`);
     const botDesc = (seg.lastR===g.rows-1||vPrimary) ? `F(${fw})` : (botUseH ? `${botMT}/2(${botBnd})` : `F(${fw})`);
     const rawSpan = y1-y0;
-    formulaParts.push(`${rawSpan}${(adTop||adBot)?`−덧(${adTop}+${adBot})`:''}→${spanH}−${topDesc}−${botDesc}+${tol}=${Math.round(cutLen)}`);
+    formulaParts.push(`${rawSpan}${(adTop||adBot)?`−덧(${adTop}+${adBot})`:''}→${spanH}−${topDesc}−${botDesc}+${tol}=${rDim(cutLen)}`);
   });
   return {cutLen:Math.max(0,totalCutLen), segs, formula:formulaParts.join(' | ')};
 }
@@ -2467,7 +2469,7 @@ function computeHMulCut(i, g){
     totalCutLen   += cutLen;
     const lDesc    = leftType==='frame'  ? `F(${fw})` : `${leftMT}/2(${leftBnd})`;
     const rDesc    = rightType==='frame' ? `F(${fw})` : `${rightMT}/2(${rightBnd})`;
-    formulaParts.push(`${spanW}−${lDesc}−${rDesc}+${tol}=${Math.round(cutLen)}`);
+    formulaParts.push(`${spanW}−${lDesc}−${rDesc}+${tol}=${rDim(cutLen)}`);
   });
   return {cutLen:Math.max(0,totalCutLen), segs, formula:formulaParts.join(' | ')};
 }
@@ -4473,7 +4475,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
   const bottomEdge = (bMW !== undefined) ? bMW : ((r === rows-1) ? fw : mw/2);
   const sashH = openH - topAddon - botAddon - topEdge - bottomEdge + tol;
 
-  return {sashW: Math.round(sashW), sashH: Math.round(sashH),
+  return {sashW: rDim(sashW), sashH: rDim(sashH),
           leftEdge, rightEdge, topEdge, bottomEdge, tol, fw, mw,
           openW, openH, topAddon, botAddon};
 }
@@ -4931,7 +4933,7 @@ function drawWindow(W,H,g){
       out+=`<rect x="${px(xp-vmw/2)}" y="${py(topBorder)}" width="${sc(vmw)}" height="${sc(mulH)}" fill="${MUL_FILL}" stroke="${MUL_STK}" stroke-width="1.2"/>`;
     });
     // 라벨: 덧바 제외한 가시 범위 중심
-    const actualCutH=Math.round(vCutRes.cutLen);
+    const actualCutH=rDim(vCutRes.cutLen);
     const fs=vCutRes.segs[0], ls=vCutRes.segs[vCutRes.segs.length-1];
     const lbY0 = fs ? g.hPos[fs.firstR]+(fs.firstR===0?(g.addonTop||0):0) : (g.addonTop||0);
     const lbY1 = ls ? g.hPos[ls.lastR+1]-(ls.lastR===g.rows-1?(g.addonBot||0):0) : H-(g.addonBot||0);
@@ -6981,7 +6983,7 @@ function computeCost(W,H,g){
     if(!mulByType[mt]) mulByType[mt]={len:0,count:0,cutLens:[],formulas:[]};
     mulByType[mt].len+=cutInfo.cutLen/1000;
     mulByType[mt].count+=1;
-    mulByType[mt].cutLens.push(Math.round(cutInfo.cutLen));
+    mulByType[mt].cutLens.push(rDim(cutInfo.cutLen));
     mulByType[mt].formulas.push(cutInfo.formula);
   }
   // 실제 분할 세그먼트까지 포함한 중간바 총 개수 (커플링 계산용)
@@ -7501,7 +7503,7 @@ function buildCutTable(W,H,g,ci){
       const sashLen = handleDir === 'sH' ? (c.sH || 0) : (c.sW || 0);
       const hole = (sashLen + 5) / 2;
       const dirLabel = handleDir === 'sH' ? `샤시H(${sashLen})` : `샤시W(${sashLen})`;
-      h+=`<tr><td>가공홀${ci.sashCells.length>1?i+1:''} (${ct})</td><td colspan="2" title="(${dirLabel}+5)÷2" style="text-align:center">${Math.round(hole)} mm</td><td>${qty}</td></tr>`;
+      h+=`<tr><td>가공홀${ci.sashCells.length>1?i+1:''} (${ct})</td><td colspan="2" title="(${dirLabel}+5)÷2" style="text-align:center">${rDim(hole)} mm</td><td>${qty}</td></tr>`;
     });
   }
 
@@ -7589,7 +7591,7 @@ function buildCutTable(W,H,g,ci){
       }
       cutH = c.cH - adTop_ - adBot_ - tEdge - bEdge + effSashTol;
       calcH = `${c.cH}${adTop_?'−'+adTop_:''}${adBot_?'−'+adBot_:''}−${tEdge}−${bEdge}+${effSashTol}`;
-      h+=`<tr><td>샤시${i+1} (${c.ct})</td><td title="${calcW}">${Math.round(cutW)}</td><td title="${calcH}">${Math.round(cutH)}</td><td>${qty}</td></tr>`;
+      h+=`<tr><td>샤시${i+1} (${c.ct})</td><td title="${calcW}">${rDim(cutW)}</td><td title="${calcH}">${rDim(cutH)}</td><td>${qty}</td></tr>`;
     });
   }
 
@@ -7609,7 +7611,7 @@ function buildCutTable(W,H,g,ci){
             const rowSash=ci.sashCells.filter(sc=>sc.r===r)[0];
             if(rowSash){const cutH=rowSash.sH-84-4;h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)}) <span style="color:var(--accent3);font-size:9px">★샤시부착(행${r+1})</span></td><td>—</td><td title="샤시H(${rowSash.sH})−84−4">${cutH}</td><td>${qty}</td></tr>`;}
           } else {
-            const fw2=g.fw,tol2=g.mulTol;const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;const segCut=Math.round((y1-y0)-topBnd-botBnd+tol2);
+            const fw2=g.fw,tol2=g.mulTol;const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
             if(segCut>0)h+=`<tr><td>수직${vSpecIdx++} (M99) <span style="color:var(--text3);font-size:9px">(FIX구간)</span></td><td>—</td><td>${segCut}</td><td>${qty}</td></tr>`;
           }
         }
@@ -7625,11 +7627,11 @@ function buildCutTable(W,H,g,ci){
             const _vp=getMulPriority()==='V';
             const topBnd=seg.firstR===0?fw2:(_vp?fw2:mullionWidth(getHMulType(seg.firstR-1))/2);
             const botBnd=seg.lastR===g.rows-1?fw2:(_vp?fw2:mullionWidth(getHMulType(seg.lastR))/2);
-            const segCut=Math.round(spanH-topBnd-botBnd+tol2);
+            const segCut=rDim(spanH-topBnd-botBnd+tol2);
             h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="행${seg.firstR+1}~${seg.lastR+1}">${segCut}</td><td>${qty}</td></tr>`;
           });
         } else {
-          h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="${res.formula}">${Math.round(res.cutLen)}</td><td>${qty}</td></tr>`;
+          h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="${res.formula}">${rDim(res.cutLen)}</td><td>${qty}</td></tr>`;
         }
       }
     }
@@ -7641,11 +7643,11 @@ function buildCutTable(W,H,g,ci){
           const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
           const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
           const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-          const segCut = Math.round((x1-x0)-leftBnd-rightBnd+g.mulTol);
+          const segCut = rDim((x1-x0)-leftBnd-rightBnd+g.mulTol);
           h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="열${seg.firstC+1}~${seg.lastC+1}">${segCut}</td><td>—</td><td>${qty}</td></tr>`;
         });
       } else {
-        h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="${res.formula}">${Math.round(res.cutLen)}</td><td>—</td><td>${qty}</td></tr>`;
+        h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="${res.formula}">${rDim(res.cutLen)}</td><td>—</td><td>${qty}</td></tr>`;
       }
     }
   }
@@ -7693,7 +7695,7 @@ function buildCutTable(W,H,g,ci){
               const fw2=g.fw,tol2=g.mulTol;
               const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;
               const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;
-              const segCut=Math.round((y1-y0)-topBnd-botBnd+tol2);
+              const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
               if(segCut>0)h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (M99) <span style="color:var(--text3);font-size:9px">(FIX구간)</span></td><td>—</td><td>${segCut-90}</td><td>${qty}</td></tr>`;
             }
           }
@@ -7709,11 +7711,11 @@ function buildCutTable(W,H,g,ci){
               const _vp2=getMulPriority()==='V';
               const topBnd=seg.firstR===0?fw2:(_vp2?fw2:mullionWidth(getHMulType(seg.firstR-1))/2);
               const botBnd=seg.lastR===g.rows-1?fw2:(_vp2?fw2:mullionWidth(getHMulType(seg.lastR))/2);
-              const segCut=Math.round(spanH-topBnd-botBnd+tol2);
+              const segCut=rDim(spanH-topBnd-botBnd+tol2);
               h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (${dn(vt)})</td><td>—</td><td title="행${seg.firstR+1}~${seg.lastR+1} − 90">${segCut-90}</td><td>${qty}</td></tr>`;
             });
           } else {
-            const vCutLen = Math.round(res.cutLen);
+            const vCutLen = rDim(res.cutLen);
             h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (${dn(vt)})</td><td>—</td><td>${vCutLen - 90}</td><td>${qty}</td></tr>`;
           }
         }
@@ -7726,11 +7728,11 @@ function buildCutTable(W,H,g,ci){
             const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
             const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
             const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-            const segCut = Math.round((x1-x0)-leftBnd-rightBnd+g.mulTol);
+            const segCut = rDim((x1-x0)-leftBnd-rightBnd+g.mulTol);
             h+=`<tr><td>수평중간바${hReinIdx++} 보강재 (${dn(ht)})</td><td title="열${seg.firstC+1}~${seg.lastC+1} − 90">${segCut-90}</td><td>—</td><td>${qty}</td></tr>`;
           });
         } else {
-          const hCutLen = Math.round(res.cutLen);
+          const hCutLen = rDim(res.cutLen);
           h+=`<tr><td>수평중간바${hReinIdx++} 보강재 (${dn(ht)})</td><td>${hCutLen - 90}</td><td>—</td><td>${qty}</td></tr>`;
         }
       }
@@ -8386,7 +8388,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
       }
     }
     const sashLen = handleDir === 'sH' ? (c.sH || 0) : (c.sW || 0);
-    return Math.round((sashLen + 5) / 2);
+    return rDim((sashLen + 5) / 2);
   });
   const adTop = g.addonTop || 0, adBot = g.addonBot || 0;
   const adLeft = g.addonLeft || 0, adRight = g.addonRight || 0;
@@ -8426,7 +8428,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
     const sReinfSub = 130;
     return {
       idx: i+1, ct: c.ct, isFix: c.isFix,
-      W: Math.round(cutW), H: Math.round(cutH),
+      W: rDim(cutW), H: rDim(cutH),
       reinfW: Math.round((c.sW||0) - sReinfSub),
       reinfH: Math.round((c.sH||0) - sReinfSub),
       glassW: Math.round(c.glassW), glassH: Math.round(c.glassH),
@@ -8469,7 +8471,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
           const fw2=g.fw,tol2=g.mulTol;
           const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;
           const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;
-          const segCut=Math.round((y1-y0)-topBnd-botBnd+tol2);
+          const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
           if(segCut>0) mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:'M92',H:segCut,reinfH:Math.round(segCut-90)});
         }
       }
@@ -8485,11 +8487,11 @@ function collectWorkOrderData(W, H, qty, g, ci){
           const spanH=(y1-y0)-adTop-adBot;
           const topBnd=seg.firstR===0?fw2:mullionWidth(getHMulType(seg.firstR-1))/2;
           const botBnd=seg.lastR===g.rows-1?fw2:mullionWidth(getHMulType(seg.lastR))/2;
-          const segCut=Math.round(spanH-topBnd-botBnd+tol2);
+          const segCut=rDim(spanH-topBnd-botBnd+tol2);
           mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:vt,H:segCut,reinfH:Math.round(segCut-90)});
         });
       } else {
-        const cutH=Math.round(res.cutLen);
+        const cutH=rDim(res.cutLen);
         mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:vt,H:cutH,reinfH:Math.round(cutH-90)});
       }
     }
@@ -8503,12 +8505,12 @@ function collectWorkOrderData(W, H, qty, g, ci){
         const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
         const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
         const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-        const segCut = Math.round((x1-x0)-leftBnd-rightBnd+tol);
+        const segCut = rDim((x1-x0)-leftBnd-rightBnd+tol);
         mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:segCut,reinfW:Math.round(segCut-90)});
       });
     } else {
-      const mReinfW = Math.round(res.cutLen) - 90;
-      mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:Math.round(res.cutLen),reinfW:Math.round(mReinfW)});
+      const mReinfW = rDim(res.cutLen) - 90;
+      mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:rDim(res.cutLen),reinfW:rDim(mReinfW)});
     }
   }
 
@@ -8525,7 +8527,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
     // 환봉
     if(ci.sashCells.length>0){
       const s0 = ci.sashCells[0];
-      const rodLen = Math.round((s0.sH||0) / 2 - 3);
+      const rodLen = rDim((s0.sH||0) / 2 - 3);
       tsRails.push({name:'환봉', len: rodLen});
       const coverW = Math.round((s0.sW||0) - 6);
       tsRails.push({name:'T/S 샤시 상부커버', len: coverW});
