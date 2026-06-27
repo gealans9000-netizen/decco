@@ -10053,8 +10053,8 @@ function batchExcel(){
     sheets += `<tr style="font-weight:700;font-size:14px;color:#333;text-align:center"><td style="text-align:center">창호번호</td><td style="text-align:center">부호(위치)</td><td style="text-align:center">가로(mm)</td><td style="text-align:center">세로(mm)</td><td style="text-align:center">수량</td></tr>`;
     
     // 프레임/중간바 외경 두께 (일괄 출력과 동일)
-    const FRAME_EXT_THICK = { F70: 70, F84: 84 };
-    const MUL_EXT_THICK   = { M92: 92, M108: 108, M64: 64 };
+    const FRAME_EXT_THICK = { F70: 72, F84: 90 };
+    const MUL_EXT_THICK   = { M92: 99, M108: 108, M64: 64 };
     function computeFrameInner(item){
       if(!item.wo) return [];
       const wo = item.wo;
@@ -10092,8 +10092,8 @@ function batchExcel(){
         const cellW = cell.cW || cell.openW || cell.W || 0;
         const cellH = cell.cH || cell.openH || cell.H || 0;
         const r = reduceForCell(cell);
-        const frameInnerW = Math.max(0, Math.round(cellW - r.left - r.right));
-        const frameInnerH = Math.max(0, Math.round(cellH - r.top - r.bot));
+        const frameInnerW = Math.max(0, rDim(cellW - r.left - r.right));
+        const frameInnerH = Math.max(0, rDim(cellH - r.top - r.bot));
         return { frameInnerW, frameInnerH, sashIdx: idx };
       });
     }
@@ -12855,8 +12855,8 @@ function printGlassScreenList(opt){
   
   // 프레임/중간바 외경 두께 (외부 내경 계산용)
   // F70=70mm, F84=84mm, M92=92mm, M108=108mm, M64=64mm
-  const FRAME_EXT_THICK = { F70: 70, F84: 84 };
-  const MUL_EXT_THICK   = { M92: 92, M108: 108, M64: 64 };
+  const FRAME_EXT_THICK = { F70: 72, F84: 90 };
+  const MUL_EXT_THICK   = { M92: 99, M108: 108, M64: 64 };
   
   // 한 항목의 OPEN 셀들의 "프레임 외부 내경 사이즈" 계산
   // 반환: [{ frameInnerW, frameInnerH, sashIdx }, ...] — openSashs 순서
@@ -12935,8 +12935,8 @@ function printGlassScreenList(opt){
       const cellW = cell.cW || cell.openW || cell.W || 0;
       const cellH = cell.cH || cell.openH || cell.H || 0;
       const r = reduceForCell(cell);
-      const frameInnerW = Math.max(0, Math.round(cellW - r.left - r.right));
-      const frameInnerH = Math.max(0, Math.round(cellH - r.top - r.bot));
+      const frameInnerW = Math.max(0, rDim(cellW - r.left - r.right));
+      const frameInnerH = Math.max(0, rDim(cellH - r.top - r.bot));
       // 간단한 진단 (필요시 주석 해제)
       // console.log('[frameInner]', item.mark, cell.r+'_'+cell.c, cellW+'×'+cellH, '→', frameInnerW+'×'+frameInnerH);
       return { frameInnerW, frameInnerH, sashIdx: idx };
