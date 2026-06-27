@@ -4574,8 +4574,14 @@ function computeGeom(W,H,nV,nH){
         gH=Math.max(0, cH - adT - adB - tMW - bMW - 24);
       } else {
         const effSw2 = (baseType==='DOOR') ? 92*2 : (baseType==='PROJ') ? 63*2 : sw2;
-        gW=Math.max(0, (sW||0) - effSw2 - 12);
-        gH=Math.max(0, (sH||0) - effSw2 - 12);
+        const _stype = document.getElementById('sashType').value;
+        if(_stype==='S108'){
+          gW=Math.max(0, (sW||0) - 56 - 56 - 60 - 12);
+          gH=Math.max(0, (sH||0) - 56 - 56 - 60 - 12);
+        } else {
+          gW=Math.max(0, (sW||0) - effSw2 - 12);
+          gH=Math.max(0, (sH||0) - effSw2 - 12);
+        }
       }
 
       // 셀 이름 계산 (FIX 번호 매기기)
@@ -7654,13 +7660,13 @@ function buildCutTable(W,H,g,ci){
 
   // ── 6. 보강재 ──
   {
-    const fReinfSub_ = 105;
+    const fReinfSub_ = (ft==='F84')?130:105;
     const frameReinfW_ = frameW - fReinfSub_;
     const frameReinfH_ = frameH - fReinfSub_;
     h+=`<tr class="sh"><td colspan="4">🔩 보강재 치수</td></tr>`;
     h+=`<tr><td>프레임 보강재 (${dn(ft)})</td><td title="프레임W(${frameW})−${fReinfSub_}">${frameReinfW_}</td><td title="프레임H(${frameH})−${fReinfSub_}">${frameReinfH_}</td><td>${qty}</td></tr>`;
     if(ci.sashCells.length>0){
-      const sReinfSub_ = 130;
+      const sReinfSub_ = (st==='S108')?190:(st==='S89')?147:130;
       ci.sashCells.forEach((c,i)=>{
         const srW=Math.round((c.sW||0)-sReinfSub_);
         const srH=Math.round((c.sH||0)-sReinfSub_);
@@ -7814,11 +7820,11 @@ function buildCutTable(W,H,g,ci){
     const gW=c.glassW, gH=c.glassH;
     const calcW=c.isFix
       ? `${c.cW}−${c.lMW}−${c.rMW}−24`
-      : `${c.sW||0}−${effSpw}−${effSpw}−12`;
+      : (st==='S108' ? `${c.sW||0}−56−56−60−12` : `${c.sW||0}−${effSpw}−${effSpw}−12`);
     const adT_=(c.r===0)?adTop:0, adB_=(c.r===g.rows-1)?adBot:0;
     const calcH=c.isFix
       ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−24`
-      : `${c.sH||0}−${effSpw}−${effSpw}−12`;
+      : (st==='S108' ? `${c.sH||0}−56−56−60−12` : `${c.sH||0}−${effSpw}−${effSpw}−12`);
     h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDim(gW)}</td><td title="${calcH}">${rDim(gH)}</td><td>${qty}</td></tr>`;
   });
 
@@ -8401,7 +8407,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
   const isTSTS = baseType === 'TSTS';
 
   // ── 프레임 절단 ──
-  const fReinfSub = 105;
+  const fReinfSub = (ft==='F84')?130:105;
   const frame = { type: ft, W: frameW, H: frameH, reinfW: frameW - fReinfSub, reinfH: frameH - fReinfSub };
 
   // ── OPEN / FIX 분할 정보 ──
@@ -8425,7 +8431,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
       cutW = c.cW - lEdge - rEdge + effSashTol;
       cutH = c.cH - adTop_ - adBot_ - tEdge - bEdge + effSashTol;
     }
-    const sReinfSub = 130;
+    const sReinfSub = (st==='S108')?190:(st==='S89')?147:130;
     return {
       idx: i+1, ct: c.ct, isFix: c.isFix,
       W: rDim(cutW), H: rDim(cutH),
