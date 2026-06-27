@@ -8162,12 +8162,12 @@ function applySettings(s){
   const fixSelEl=document.getElementById('glassTypeFix');
   if(fixSelEl) fixSelEl.value=s.glassTypeFix||'same';
   // optScreen is now always enabled (moved to spec panel)
-  // 프로파일 폭
-  if(s.pwF84)document.getElementById('pw-F84').value=s.pwF84;
-  if(s.pwF70)document.getElementById('pw-F70').value=s.pwF70;
-  if(s.pwM92)document.getElementById('pw-M92').value=s.pwM92;
-  if(s.pwM64)document.getElementById('pw-M64').value=s.pwM64;
-  if(s.pwM108)document.getElementById('pw-M108').value=s.pwM108;
+  // 프로파일 폭 — 데코 표준 사양 고정 (옛 게알란 프로젝트의 저장값 44/40 등으로 덮어쓰지 않음)
+  document.getElementById('pw-F84').value=61.5;
+  document.getElementById('pw-F70').value=43.5;
+  document.getElementById('pw-M92').value=42;
+  document.getElementById('pw-M64').value=32;
+  document.getElementById('pw-M108').value=58;
   if(s.pwSTOL)document.getElementById('pw-STOL').value=s.pwSTOL;
   // 창호 타입
   baseType=s.baseType||'TS';
