@@ -380,17 +380,17 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
     <a href="https://gealans9000-manager.vercel.app/index.html" target="_blank" rel="noopener" title="GEALAN 창호 견적 프로그램 열기 (새 탭)" style="margin-left:14px;padding:4px 12px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4);border-radius:6px;color:#fff;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:5px">🔷 GEALAN 창호 ↗</a>
   </div>
   <div class="hdr-btns"><span id="autosave-badge" style="font-size: 9px; color: var(--text3); margin-right: 4px; white-space: nowrap;">🔄 자동저장 21:06</span>
-    <button class="btn btn-sm" style="background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.4)" onclick="openPdfImportModal()" title="PDF 일람표 파일에서 창호 목록 자동 입력">📄 PDF 자동입력</button>
-    <button class="btn btn-sm" style="background:rgba(62,207,130,.15);color:#3ecf82;border:1px solid rgba(62,207,130,.4)" onclick="downloadExcelTemplate()" title="표준 엑셀 양식 다운로드 — 거래처에 전달하여 입력 받기">📊 양식 다운로드</button>
-    <button class="btn btn-sm" style="background:rgba(62,207,130,.15);color:#3ecf82;border:1px solid rgba(62,207,130,.4)" onclick="document.getElementById('excel-import-input').click()" title="엑셀 양식 파일에서 창호 목록 자동 입력">📊 엑셀 자동입력</button>
+    <button class="btn btn-sm" style="background:#d98723;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="openPdfImportModal()" title="PDF 일람표 파일에서 창호 목록 자동 입력">📄 PDF 자동입력</button>
+    <button class="btn btn-sm" style="background:#2ea866;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="downloadExcelTemplate()" title="표준 엑셀 양식 다운로드 — 거래처에 전달하여 입력 받기">📊 양식 다운로드</button>
+    <button class="btn btn-sm" style="background:#1f9457;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="document.getElementById('excel-import-input').click()" title="엑셀 양식 파일에서 창호 목록 자동 입력">📊 엑셀 자동입력</button>
     <input type="file" id="excel-import-input" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(event)">
-    <button class="btn btn-sm" style="background:rgba(91,141,239,.15);color:var(--accent);border:1px solid rgba(91,141,239,.4)" onclick="saveToCloud()" title="클라우드(Supabase)에 저장 - 어디서든 접속 가능">☁️ 클라우드 저장</button>
-    <button class="btn btn-sm" style="background:rgba(91,141,239,.15);color:var(--accent);border:1px solid rgba(91,141,239,.4)" onclick="openCloudLoadModal()" title="클라우드에서 프로젝트 불러오기">📥 클라우드 목록</button>
-    <button class="btn btn-sm" style="background:rgba(52,212,184,.12);color:var(--accent2);border:1px solid rgba(52,212,184,.3)" onclick="saveProject()" title="현장 데이터를 파일로 저장 (백업용)">💾 파일</button>
-    <button class="btn btn-sm" style="background:rgba(155,114,245,.12);color:var(--purple);border:1px solid rgba(155,114,245,.3)" onclick="document.getElementById(&#39;file-load-input&#39;).click()" title="저장된 현장 파일 불러오기">📂 파일에서</button>
+    <button class="btn btn-sm" style="background:#3f77db;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="saveToCloud()" title="클라우드(Supabase)에 저장 - 어디서든 접속 가능">☁️ 클라우드 저장</button>
+    <button class="btn btn-sm" style="background:#2d5fc0;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="openCloudLoadModal()" title="클라우드에서 프로젝트 불러오기">📥 클라우드 목록</button>
+    <button class="btn btn-sm" style="background:#14a08b;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="saveProject()" title="현장 데이터를 파일로 저장 (백업용)">💾 파일</button>
+    <button class="btn btn-sm" style="background:#7c53d6;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="document.getElementById(&#39;file-load-input&#39;).click()" title="저장된 현장 파일 불러오기">📂 파일에서</button>
     <input type="file" id="file-load-input" accept=".json" style="display:none" onchange="loadProject(event)">
-    <button class="btn btn-sm" style="background:rgba(245,166,35,.12);color:#f5a623;border:1px solid rgba(245,166,35,.3)" onclick="window.open('https://winkhaus-bom-calculator.vercel.app/', 'winkhaus_bom', 'noopener')" title="Winkhaus 하드웨어 BOM 계산기 (새 창)">🔧 하드웨어 BOM</button>
-    <button class="btn btn-sm" style="background:rgba(19,65,62,.12);color:#176B66;border:1px solid rgba(23,107,102,.4)" onclick="window.open('https://inventory-nine-vert.vercel.app/', 'gealan_inventory', 'noopener')" title="재고관리 (새 창)">📦 재고관리</button>
+    <button class="btn btn-sm" style="background:#b5701a;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="window.open('https://winkhaus-bom-calculator.vercel.app/', 'winkhaus_bom', 'noopener')" title="Winkhaus 하드웨어 BOM 계산기 (새 창)">🔧 하드웨어 BOM</button>
+    <button class="btn btn-sm" style="background:#2a7d74;color:#fff;border:1px solid rgba(255,255,255,.28)" onclick="window.open('https://inventory-nine-vert.vercel.app/', 'gealan_inventory', 'noopener')" title="재고관리 (새 창)">📦 재고관리</button>
     <div class="auth-info" id="auth-info" style="display:none;margin-left:8px;position:relative">
       <div class="auth-user">
         <span class="auth-name" id="auth-name">—</span>
