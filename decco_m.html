@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2b303a">
+<title>DECCO 현장 뷰어 (모바일)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#2b303a; --navy2:#3a3f4b; --ink:#0f1726; --paper:#f4f1ea;
+    --line:#d8d2c4; --line2:#c4bdad; --accent:#d2691e; --accent2:#1a4488;
+    --green:#2f8f5b; --amber:#c98a16; --gray:#7a8290; --red:#cc2e2e;
+    --card:#ffffff; --muted:#6b7280;
+    --shadow:0 1px 3px rgba(15,23,38,.10),0 4px 18px rgba(15,23,38,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'Noto Sans KR',system-ui,sans-serif;
+    background:
+      linear-gradient(180deg,#efeada 0%,#f4f1ea 30%,#f4f1ea 100%);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input{font-family:inherit}
+
+  /* ── App top bar ── */
+  .topbar{
+    position:sticky;top:0;z-index:40;
+    background:linear-gradient(180deg,var(--navy) 0%,var(--navy2) 100%);
+    color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    display:flex;align-items:center;gap:12px;
+    box-shadow:0 2px 14px rgba(15,23,38,.28);
+  }
+  .topbar .brand{display:flex;flex-direction:column;line-height:1.05;flex:1;min-width:0}
+  .topbar .brand b{font-size:16px;font-weight:900;letter-spacing:.5px}
+  .topbar .brand small{font-size:10px;letter-spacing:2.5px;color:#9db0d4;font-weight:500;margin-top:2px}
+  .topbar .badge-ro{
+    font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#cfe0ff;
+    border:1px solid rgba(157,176,212,.5);border-radius:999px;padding:3px 9px;white-space:nowrap;
+  }
+  .back-btn{
+    width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.10);
+    color:#fff;font-size:19px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .back-btn:active{background:rgba(255,255,255,.22)}
+  .icon-btn{
+    width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.10);
+    color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .icon-btn:active{background:rgba(255,255,255,.22)}
+
+  /* ── Generic ── */
+  .wrap{max-width:680px;margin:0 auto;padding:14px 14px calc(env(safe-area-inset-bottom) + 28px)}
+  .hidden{display:none !important}
+  .center-screen{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+
+  /* ── Login ── */
+  .login-card{
+    width:100%;max-width:380px;background:var(--card);border-radius:18px;padding:30px 24px 26px;
+    box-shadow:var(--shadow);border:1px solid var(--line);
+  }
+  .login-logo{text-align:center;margin-bottom:22px}
+  .login-logo .mark{
+    display:inline-flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:16px;
+    background:linear-gradient(135deg,var(--navy),var(--accent2));color:#fff;font-size:24px;font-weight:900;
+    box-shadow:0 6px 18px rgba(22,35,63,.3);margin-bottom:12px;letter-spacing:-1px;
+  }
+  .login-logo b{display:block;font-size:19px;font-weight:900;color:var(--navy);letter-spacing:.5px}
+  .login-logo small{display:block;font-size:10px;letter-spacing:2.5px;color:var(--gray);margin-top:3px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--navy2);margin-bottom:6px}
+  .field input{
+    width:100%;padding:13px 14px;font-size:16px;border:1.5px solid var(--line);border-radius:11px;
+    background:#fbfaf6;color:var(--ink);transition:border-color .15s,box-shadow .15s;
+  }
+  .field input:focus{outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(26,68,136,.13);background:#fff}
+  .btn-primary{
+    width:100%;padding:14px;font-size:15px;font-weight:800;color:#fff;border-radius:12px;letter-spacing:.5px;
+    background:linear-gradient(135deg,var(--navy) 0%,var(--accent2) 100%);
+    box-shadow:0 5px 16px rgba(22,35,63,.28);transition:transform .1s,box-shadow .15s;margin-top:6px;
+  }
+  .btn-primary:active{transform:translateY(1px);box-shadow:0 2px 8px rgba(22,35,63,.3)}
+  .btn-primary:disabled{opacity:.6}
+  .login-err{
+    margin-top:12px;font-size:13px;color:var(--red);background:rgba(204,46,46,.08);
+    border:1px solid rgba(204,46,46,.25);border-radius:10px;padding:9px 12px;display:none;
+  }
+
+  /* ── Search / filter ── */
+  .searchbar{display:flex;gap:8px;margin-bottom:12px}
+  .searchbar input{
+    flex:1;padding:12px 14px;font-size:15px;border:1.5px solid var(--line);border-radius:12px;
+    background:var(--card);box-shadow:var(--shadow);
+  }
+  .searchbar input:focus{outline:none;border-color:var(--accent2)}
+  .chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex-shrink:0;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:999px;white-space:nowrap;
+    background:var(--card);color:var(--navy2);border:1.5px solid var(--line);transition:all .12s;
+  }
+  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .chip:active{transform:scale(.96)}
+
+  /* ── Project list ── */
+  .list-meta{font-size:12px;color:var(--muted);margin:2px 2px 12px;font-weight:500}
+  .pcard{
+    background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 15px;margin-bottom:11px;
+    box-shadow:var(--shadow);transition:transform .1s;position:relative;overflow:hidden;
+  }
+  .pcard:active{transform:scale(.985)}
+  .pcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bar,var(--gray))}
+  .pcard .folder{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.3px;margin-bottom:3px;display:flex;align-items:center;gap:4px}
+  .pcard .ptitle{font-size:16px;font-weight:800;color:var(--ink);line-height:1.3;margin-bottom:7px}
+  .pcard .prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .pcard .loc{color:var(--navy2);font-weight:600}
+  .pcard .pbot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+  .pcard .cnt{font-size:12.5px;color:var(--navy2);font-weight:700}
+  .pcard .amt{font-size:14px;font-weight:800;color:var(--accent2)}
+  .pcard .date{font-size:11px;color:var(--gray)}
+  .status-badge{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:.2px}
+
+  /* ── Detail ── */
+  .detail-head{
+    background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px 16px;margin-bottom:14px;
+    box-shadow:var(--shadow);
+  }
+  .detail-head h2{font-size:18px;font-weight:900;color:var(--navy);line-height:1.3;margin-bottom:2px}
+  .detail-head .dh-folder{font-size:11.5px;font-weight:700;color:var(--accent);margin-bottom:6px}
+  .detail-head .dh-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin-top:11px;font-size:13px}
+  .detail-head .dh-grid dt{color:var(--gray);font-weight:600;white-space:nowrap}
+  .detail-head .dh-grid dd{color:var(--ink);font-weight:600;text-align:right}
+  .detail-head .dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .special-note{
+    background:#fff4f0;border:1.5px solid var(--accent);border-radius:11px;padding:10px 13px;margin-bottom:13px;
+    color:#a3470f;font-weight:700;font-size:13px;line-height:1.45;display:flex;gap:7px;
+  }
+  .sec-label{font-size:12px;font-weight:800;color:var(--navy2);letter-spacing:1px;margin:4px 2px 10px;display:flex;align-items:center;gap:8px}
+  .sec-label::after{content:'';flex:1;height:1px;background:var(--line)}
+
+  /* ── Window card ── */
+  .wcard{
+    background:var(--card);border:1px solid var(--line);border-radius:15px;margin-bottom:13px;overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .wcard.cancelled{opacity:.72}
+  .wc-top{display:flex;align-items:center;gap:9px;padding:11px 13px;background:linear-gradient(180deg,#fafaf7,#f2efe7);border-bottom:1px solid var(--line)}
+  .wc-num{
+    min-width:38px;height:30px;padding:0 9px;border-radius:9px;background:#e8141e;color:#fff;
+    font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    box-shadow:0 2px 5px rgba(232,20,30,.3);
+  }
+  .wc-type{font-size:12px;font-weight:800;color:#fff;padding:4px 10px;border-radius:8px;background:var(--accent2);white-space:nowrap}
+  .wc-size{font-size:15px;font-weight:800;color:var(--ink);margin-left:2px}
+  .wc-qty{margin-left:auto;font-size:14px;font-weight:900;color:#b8000a;background:#fff200;border:2px solid #d4a500;border-radius:7px;padding:1px 10px;flex-shrink:0}
+  .wc-draw{background:#fff;padding:10px;display:flex;align-items:center;justify-content:center;position:relative}
+  .wc-draw svg,.wc-draw img{width:100%;height:auto;max-height:46vh;display:block}
+  .wc-zoom{position:absolute;right:11px;bottom:11px;width:38px;height:38px;border-radius:11px;background:rgba(22,35,63,.85);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .wc-zoom:active{background:var(--navy)}
+  .wc-tags{display:flex;flex-wrap:wrap;gap:6px;padding:11px 13px;border-top:1px solid var(--line)}
+  .tag{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:7px;background:#eef1f6;color:var(--navy2)}
+  .tag.loc{background:rgba(26,68,136,.10);color:var(--accent2)}
+  .tag.color{background:rgba(122,130,144,.13);color:#4b5563}
+  .tag.handle{color:#fff}
+  .tag.mark{background:rgba(210,105,30,.12);color:var(--accent)}
+  .cancel-banner{background:var(--red);color:#fff;font-size:12px;font-weight:800;padding:6px 13px;display:flex;align-items:center;gap:6px}
+  .item-note{background:#fff200;border-top:1px solid #d4a500;color:#9a1c1c;font-weight:800;font-size:12px;padding:7px 13px;display:flex;gap:6px}
+
+  /* ── Zoom overlay ── */
+  .zoom-overlay{
+    position:fixed;inset:0;z-index:90;background:rgba(15,23,38,.94);display:none;
+    flex-direction:column;
+  }
+  .zoom-overlay.on{display:flex}
+  .zoom-bar{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;color:#fff}
+  .zoom-bar .zt{flex:1;font-size:14px;font-weight:700}
+  .zoom-bar button{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.14);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+  .zoom-stage{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:10px;-webkit-overflow-scrolling:touch}
+  .zoom-stage .inner{background:#fff;border-radius:8px;padding:14px;transition:transform .12s}
+  .zoom-stage svg,.zoom-stage img{display:block;width:88vw;max-width:760px;height:auto}
+  .zoom-hint{text-align:center;color:#9db0d4;font-size:12px;padding:0 0 calc(env(safe-area-inset-bottom) + 14px)}
+  .zoom-ctrls{display:flex;justify-content:center;gap:12px;padding:10px}
+  .zoom-ctrls button{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .zoom-ctrls button:active{background:rgba(255,255,255,.28)}
+
+  /* ── States ── */
+  .spinner{width:34px;height:34px;border:3px solid rgba(22,35,63,.18);border-top-color:var(--accent2);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .empty{text-align:center;color:var(--gray);padding:50px 20px;font-size:14px;line-height:1.6}
+  .empty .ico{font-size:40px;margin-bottom:10px;opacity:.5}
+  .loading-row{display:flex;flex-direction:column;align-items:center;gap:12px;padding:54px 0;color:var(--gray);font-size:13px}
+
+  /* fade-in stagger */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .anim{animation:fadeUp .35s ease both}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 26px);transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 18px;border-radius:12px;font-size:13.5px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.32);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:120;max-width:88vw;text-align:center}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ── 폴더 탐색기 ── */
+  .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:3px;font-size:13px;margin:0 2px 12px;color:var(--muted)}
+  .crumbs .cr{font-weight:700;color:var(--accent2);padding:3px 6px;border-radius:7px}
+  .crumbs .cr:active{background:rgba(26,68,136,.1)}
+  .crumbs .cr.cur{color:var(--ink);background:transparent}
+  .crumbs .sep{color:var(--line2);font-weight:700}
+  .fcard{
+    background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin-bottom:9px;
+    box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;transition:transform .1s;
+  }
+  .fcard:active{transform:scale(.985);background:#fdfcf9}
+  .fcard .fico{font-size:24px;flex-shrink:0;filter:saturate(1.1)}
+  .fcard .fmain{flex:1;min-width:0}
+  .fcard .fname{font-size:15.5px;font-weight:800;color:var(--ink);line-height:1.25}
+  .fcard .fsub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .fcard .farrow{color:var(--line2);font-size:20px;font-weight:700;flex-shrink:0}
+  .fcard .fmove{display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+  .fcard .fmv{width:34px;height:24px;border:1px solid var(--line);background:#f7f6f2;border-radius:6px;font-size:11px;line-height:1;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;font-weight:800}
+  .fcard .fmv:active{background:#e9e7df}
+  .fcard .fmv[disabled]{opacity:.28}
+  .fo-reset{font-weight:700;color:var(--accent);cursor:pointer;font-size:11px;letter-spacing:0}
+  .section-tag{font-size:11px;font-weight:800;color:var(--gray);letter-spacing:1.5px;margin:14px 4px 9px}
+
+  /* ── 상세 액션바 ── */
+  .detail-actions{display:flex;gap:9px;margin-bottom:14px}
+  .act-btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:13px;
+    font-size:14px;font-weight:800;box-shadow:var(--shadow);transition:transform .1s;
+  }
+  .act-btn:active{transform:translateY(1px)}
+  .act-out{background:linear-gradient(135deg,var(--navy),var(--accent2));color:#fff}
+  .act-share{background:#fff;color:var(--navy);border:1.5px solid var(--accent2)}
+
+  /* ── 바텀 시트 ── */
+  .sheet-bg{position:fixed;inset:0;z-index:80;background:rgba(15,23,38,.5);display:none;align-items:flex-end}
+  .sheet-bg.on{display:flex;animation:fadeIn .2s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .sheet{
+    width:100%;max-width:680px;margin:0 auto;background:var(--paper);border-radius:22px 22px 0 0;
+    padding:8px 16px calc(env(safe-area-inset-bottom) + 18px);max-height:82dvh;overflow-y:auto;
+    box-shadow:0 -8px 30px rgba(15,23,38,.3);animation:slideUp .25s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+  .sheet-grip{width:42px;height:5px;border-radius:99px;background:var(--line2);margin:6px auto 12px}
+  .sheet h3{font-size:16px;font-weight:900;color:var(--navy);margin-bottom:3px}
+  .sheet .sh-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .out-item{
+    display:flex;align-items:center;gap:11px;width:100%;padding:14px 14px;margin-bottom:8px;border-radius:13px;
+    background:var(--card);border:1.5px solid var(--line);font-size:14.5px;font-weight:700;color:var(--ink);text-align:left;
+  }
+  .out-item .oico{font-size:19px;flex-shrink:0}
+  .out-item .otxt{flex:1}
+  .out-item .obadge{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+  .out-item.ready{border-color:var(--accent2)}
+  .out-item.ready:active{transform:scale(.98);background:#f3f6fb}
+  .out-item.ready .obadge{background:rgba(47,143,91,.15);color:var(--green)}
+  .out-item.locked{opacity:.55}
+  .out-item.locked .obadge{background:rgba(122,130,144,.16);color:var(--gray)}
+  .sheet-note{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:6px;padding:11px 13px;background:rgba(122,130,144,.08);border-radius:11px}
+
+  /* ── 문서 뷰어 (일람표/견적서) ── */
+  .docview{position:fixed;inset:0;z-index:85;background:#5b6470;display:none;flex-direction:column}
+  .docview.on{display:flex}
+  .doc-bar{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;background:var(--navy);color:#fff;flex-shrink:0}
+  .doc-bar .dt{flex:1;font-size:15px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc-bar button{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.14);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .doc-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 10px 18px}
+  .doc-paper{background:#fff;max-width:720px;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,.3);border-radius:3px}
+  .doc-actions{display:flex;gap:10px;padding:11px 14px calc(env(safe-area-inset-bottom) + 12px);background:var(--navy2);flex-shrink:0}
+  .doc-actions button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px;border-radius:13px;font-size:14.5px;font-weight:800;transition:transform .1s}
+  .doc-actions button:active{transform:translateY(1px)}
+  .doc-pdf{background:var(--accent);color:#fff}
+  .doc-shr{background:#fff;color:var(--navy)}
+  .doc-print{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.3)}
+  .doc-busy{position:absolute;inset:0;background:rgba(22,35,63,.6);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:#fff;font-size:14px;z-index:5}
+  .doc-busy.on{display:flex}
+
+  /* 문서 내부 (화면 + 인쇄 공통) */
+  .gdoc{font-family:'Noto Sans KR',sans-serif;color:#111;padding:14px 16px}
+  .gdoc .ghead{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #16233f;padding-bottom:7px;margin-bottom:4px;gap:8px}
+  .gdoc .ghead .hl{font-size:11px;line-height:1.7}
+  .gdoc .ghead .hc{text-align:center;flex:1}
+  .gdoc .ghead .hc .brand{font-size:11px;font-weight:800;letter-spacing:2px;color:#16233f}
+  .gdoc .ghead .hc h1{font-size:16px;font-weight:900;margin:1px 0;color:#16233f}
+  .gdoc .ghead .hc .sub{font-size:10px;color:#888;letter-spacing:1px}
+  .gdoc .ghead .hr{font-size:11px;line-height:1.7;text-align:right}
+  .gdoc .gnote{background:#fff4f0;border:1.5px solid #d2691e;border-radius:5px;padding:7px 11px;margin-bottom:8px;color:#a3470f;font-weight:700;font-size:12px}
+  .gdoc table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .gdoc th,.gdoc td{border:1px solid #aab;padding:5px 6px;text-align:center;vertical-align:middle}
+  .gdoc th{background:#e7ecf5;font-weight:800;color:#16233f}
+  .gdoc .sched-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+  .gdoc .scell{border:1px solid #99a;border-radius:5px;overflow:hidden;page-break-inside:avoid;break-inside:avoid}
+  .gdoc .scell.cxl{opacity:.6}
+  .gdoc .scell .sc-top{display:flex;align-items:center;gap:6px;padding:5px 7px;background:#eef1f7;border-bottom:1px solid #c4cbd8;font-size:11px}
+  .gdoc .scell .sc-num{min-width:26px;height:21px;padding:0 6px;background:#e8141e;color:#fff;border-radius:6px;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .gdoc .scell .sc-type{font-weight:800;color:#16233f;font-size:10.5px}
+  .gdoc .scell .sc-size{margin-left:auto;font-weight:800}
+  .gdoc .scell .sc-draw{background:#fff;padding:6px;display:flex;align-items:center;justify-content:center;min-height:120px}
+  .gdoc .scell .sc-draw svg,.gdoc .scell .sc-draw img{width:100%;height:auto;max-height:200px}
+  .gdoc .scell .sc-info{display:flex;flex-wrap:wrap;gap:4px;padding:5px 7px;font-size:10px;color:#445;border-top:1px solid #dde}
+  .gdoc .scell .sc-info b{color:#16233f}
+  .gdoc .gfoot{margin-top:9px;font-size:9px;color:#666;border-top:1px solid #ccc;padding-top:5px;display:flex;justify-content:space-between}
+  .gdoc .qtot td{font-weight:900;background:#eef7f0;color:#1a6e1a;font-size:13px}
+  .gdoc tr.cxl td{text-decoration:line-through;color:#999;background:#faf0f0}
+</style>
+<style media="print">
+  body{background:#fff !important}
+  body.printing > *{display:none !important}
+  body.printing #print-area{display:block !important;position:static !important}
+  #print-area{display:none}
+  #print-area .gdoc{padding:0}
+  #print-area .gdoc .sched-grid{grid-template-columns:repeat(2,1fr)}
+  @page{size:A4 portrait;margin:8mm}
+  #print-area .scell{page-break-inside:avoid;break-inside:avoid}
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN ════════ -->
+<div id="screen-login" class="center-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">G</div>
+      <b>DECCO 현장 뷰어</b>
+      <small>DECCO SYSTEM</small>
+    </div>
+    <div class="field">
+      <label for="li-email">이메일</label>
+      <input id="li-email" type="email" inputmode="email" autocomplete="username" placeholder="name@example.com">
+    </div>
+    <div class="field">
+      <label for="li-pwd">비밀번호</label>
+      <input id="li-pwd" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button id="li-btn" class="btn-primary">로그인</button>
+    <div id="li-err" class="login-err"></div>
+    <p style="text-align:center;font-size:11px;color:var(--gray);margin-top:16px;line-height:1.5">
+      현장 확인용 <b>읽기 전용</b> 화면입니다.<br>견적 작성·수정은 PC 버전에서 하세요.
+    </p>
+  </div>
+</div>
+
+<!-- ════════ APP ════════ -->
+<div id="screen-app" class="hidden">
+  <div class="topbar">
+    <button id="app-back" class="back-btn hidden">‹</button>
+    <div class="brand">
+      <b id="app-title">현장 목록</b>
+      <small id="app-sub">📱 모바일 버전</small>
+    </div>
+    <span id="app-rolabel" class="badge-ro">읽기전용</span>
+    <button id="app-refresh" class="icon-btn" title="새로고침">⟳</button>
+    <button id="app-logout" class="icon-btn" title="로그아웃">⏻</button>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div id="view-list" class="wrap">
+    <div class="searchbar">
+      <input id="search" type="search" placeholder="현장명·업체·부호 검색" autocomplete="off">
+    </div>
+    <div id="status-chips" class="chips"></div>
+    <div id="crumbs" class="crumbs hidden"></div>
+    <div id="list-meta" class="list-meta"></div>
+    <div id="list-body">
+      <div class="loading-row"><div class="spinner"></div>불러오는 중…</div>
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="view-detail" class="wrap hidden"></div>
+</div>
+
+<!-- ════════ ZOOM OVERLAY ════════ -->
+<div id="zoom" class="zoom-overlay">
+  <div class="zoom-bar">
+    <span id="zoom-title" class="zt"></span>
+    <button id="zoom-close">✕</button>
+  </div>
+  <div id="zoom-stage" class="zoom-stage"><div id="zoom-inner" class="inner"></div></div>
+  <div class="zoom-ctrls">
+    <button id="zoom-out">−</button>
+    <button id="zoom-reset" style="font-size:14px;font-weight:800">100%</button>
+    <button id="zoom-in">＋</button>
+  </div>
+  <div class="zoom-hint">＋ / − 버튼으로 확대하고, 드래그하여 이동하세요</div>
+</div>
+
+<!-- ════════ 출력 선택 시트 ════════ -->
+<div id="sheet-bg" class="sheet-bg">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <h3>📤 출력 · 공유</h3>
+    <div class="sh-sub">업체에 보낼 문서를 선택하세요. PDF로 저장하거나 카톡 등으로 공유할 수 있습니다.</div>
+    <div id="sheet-list"></div>
+  </div>
+</div>
+
+<!-- ════════ 문서 뷰어 ════════ -->
+<div id="docview" class="docview">
+  <div class="doc-bar">
+    <button id="doc-close">✕</button>
+    <span id="doc-title" class="dt"></span>
+  </div>
+  <div class="doc-scroll"><div id="doc-paper" class="doc-paper"></div></div>
+  <div class="doc-actions">
+    <button id="doc-pdf" class="doc-pdf">📄 PDF 보내기</button>
+    <button id="doc-img" class="doc-shr">🖼 이미지</button>
+    <button id="doc-print" class="doc-print">🖨 인쇄</button>
+  </div>
+  <div id="doc-busy" class="doc-busy"><div class="spinner" style="border-top-color:#fff"></div><span id="doc-busy-txt">이미지 만드는 중…</span></div>
+</div>
+
+<!-- 인쇄 전용 영역 (화면에서는 숨김, window.print 시에만 노출) -->
+<div id="print-area"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+// DECCO — 모바일 현장 뷰어 (읽기 전용)
+// 기존 PC 시스템과 동일한 Supabase / 데이터 / 도면 SVG 재사용
+// ════════════════════════════════════════════════
+const SUPABASE_URL = 'https://zskipcozqvflspvtkegb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── 프로젝트 상태 라벨 (PC와 동일) ──
+const PROJECT_STATUS = {
+  quote_pending:   { label:'견적 미확정', icon:'📝', color:'#7a8290', bg:'rgba(122,130,144,.14)' },
+  quote_confirmed: { label:'견적 확정',   icon:'✅', color:'#b8770f', bg:'rgba(201,138,22,.16)' },
+  producing:       { label:'생산 중',     icon:'🔨', color:'#1a4488', bg:'rgba(26,68,136,.14)' },
+  produced:        { label:'생산 완료',   icon:'📦', color:'#2f8f5b', bg:'rgba(47,143,91,.15)' },
+  shipped:         { label:'출고 완료',   icon:'🚚', color:'#5b6470', bg:'rgba(91,100,112,.14)' },
+  excluded:        { label:'제외',        icon:'🚫', color:'#999',    bg:'rgba(153,153,153,.12)' }
+};
+const STATUS_FILTERS = [
+  { key:'all',  label:'전체' },
+  { key:'quote_pending', label:'미확정' },
+  { key:'quote_confirmed', label:'확정' },
+  { key:'producing', label:'생산중' },
+  { key:'produced', label:'생산완료' },
+  { key:'shipped', label:'출고' }
+];
+
+let _projects = [];        // 원본 (data 제외 메타만 + data)
+let _filtered = [];
+let _statusFilter = 'all';
+let _searchText = '';
+let _profileName = '';
+let _folderPath = '';      // 현재 폴더 경로 ('' = 루트)
+
+// ── 폴더 보기 순서 (이 폰에만 저장 · 데이터/PC에 영향 없음) ──
+let _folderOrder = {};
+try{ _folderOrder = JSON.parse(localStorage.getItem('decco_m_folderorder')||'{}') || {}; }catch(_){ _folderOrder = {}; }
+function saveFolderOrder(){ try{ localStorage.setItem('decco_m_folderorder', JSON.stringify(_folderOrder)); }catch(_){} }
+function orderedSubFolders(segs, parentPath){
+  const saved = _folderOrder[parentPath] || [];
+  const inSaved = saved.filter(s=>segs.includes(s));
+  const rest = segs.filter(s=>!inSaved.includes(s)).sort((a,b)=>a.localeCompare(b,'ko'));
+  return [...inSaved, ...rest];
+}
+function moveFolder(parentPath, seg, dir, currentOrder){
+  const arr = currentOrder.slice();
+  const i = arr.indexOf(seg); if(i<0) return;
+  const j = i + dir; if(j<0 || j>=arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  _folderOrder[parentPath] = arr; saveFolderOrder();
+  renderList();
+}
+function resetFolderOrder(parentPath){ delete _folderOrder[parentPath]; saveFolderOrder(); toast('폴더 순서를 초기화했습니다'); renderList(); }
+
+// ── 유틸 ──
+const $ = id => document.getElementById(id);
+let _toastT = null;
+function toast(msg){ const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('on'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('on'),2300); }
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtWon = v => '₩' + Math.round(Number(v)||0).toLocaleString('ko-KR');
+function fmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const now = new Date();
+  const sameY = d.getFullYear()===now.getFullYear();
+  const mm = d.getMonth()+1, dd = d.getDate();
+  const diff = Math.floor((now - d)/86400000);
+  if(diff===0) return '오늘 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  if(diff===1) return '어제';
+  return sameY ? `${mm}/${dd}` : `${d.getFullYear()}.${mm}.${dd}`;
+}
+// PC의 parseFolderFromName과 동일: "[폴더경로]이름"
+function parseFolderName(rawName){
+  if(!rawName) return { folder:'', name:'' };
+  const m = String(rawName).match(/^\[([^\]]+)\]\s*(.*)$/);
+  if(m) return { folder:m[1].trim(), name:(m[2].trim()||rawName) };
+  return { folder:'', name:rawName };
+}
+function projectStatus(p){
+  const s = p?.data?._status;
+  return (s && PROJECT_STATUS[s]) ? s : 'quote_pending';
+}
+// 프로젝트의 폴더 경로 ('a/b/c' 또는 '')
+function projectFolderPath(p){
+  return parseFolderName(p.name).folder || '';
+}
+
+// ── 도면 SVG 정제 (다크→라이트, PC 항목 카드와 동일) ──
+function cleanSvg(wo){
+  if(!wo || !wo.svgSnapshot) return null;
+  const vb = wo.svgTightVB || wo.svgViewBox || '0 0 300 250';
+  const inner = String(wo.svgSnapshot)
+    .replace(/fill="#0d1018"/g,'fill="white"').replace(/fill="#141824"/g,'fill="white"')
+    .replace(/fill="#1a2030"/g,'fill="white"').replace(/fill="#1f2638"/g,'fill="white"')
+    .replace(/stroke="#111111"/g,'stroke="#333"').replace(/stroke="#333333"/g,'stroke="#3355bb"')
+    .replace(/stroke="rgba\(255,255,255[^)]*\)"/g,'stroke="rgba(0,0,0,0)"')
+    .replace(/(\d+) mm/g,'$1');
+  return { vb, inner };
+}
+// ── 도면 SVG 렌더 (화면용) ──
+function itemDrawingHTML(item, opts){
+  opts = opts || {};
+  const maxH = opts.maxH || '46vh';
+  const wo = item && item.wo;
+  if(wo && wo.customImgData){
+    return `<img src="${wo.customImgData}" alt="이형 도면" style="width:100%;height:auto;max-height:${maxH};object-fit:contain;background:#fff;display:block">`;
+  }
+  const cs = cleanSvg(wo);
+  if(cs){
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${esc(cs.vb)}" style="width:100%;height:auto;max-height:${maxH};background:#fff;display:block">${cs.inner}</svg>`;
+  }
+  return `<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:13px">도면 없음</div>`;
+}
+
+const HANDLE_COLOR = { '좌':'#5b8def','우':'#2f8f5b','상':'#7a5cf0','하':'#d2691e' };
+const TYPE_SHORT = { TS:'T/S',TT:'T/T',TO:'T/O',FIX:'FIX',DOOR:'DOOR',PROJ:'Proj',TTFIX:'T/T+FIX',TTTT:'양개 T/T',TSTS:'양개 T/S' };
+
+// ════════════════════════════════════════════════
+// 인증
+// ════════════════════════════════════════════════
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){
+    await onLoggedIn(session.user);
+  } else {
+    showLogin();
+  }
+}
+function showLogin(){
+  $('screen-login').classList.remove('hidden');
+  $('screen-app').classList.add('hidden');
+}
+async function doLogin(){
+  const email = $('li-email').value.trim();
+  const pwd = $('li-pwd').value;
+  const btn = $('li-btn'); const err = $('li-err');
+  err.style.display='none';
+  if(!email || !pwd){ err.textContent='이메일과 비밀번호를 입력하세요.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='로그인 중…';
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password:pwd });
+    if(error){
+      err.textContent = /Invalid login/i.test(error.message) ? '이메일 또는 비밀번호가 올바르지 않습니다.' : ('로그인 실패: ' + error.message);
+      err.style.display='block'; btn.disabled=false; btn.textContent='로그인'; return;
+    }
+    await onLoggedIn(data.user);
+  }catch(e){
+    err.textContent='오류: ' + (e.message||e); err.style.display='block';
+    btn.disabled=false; btn.textContent='로그인';
+  }
+}
+async function onLoggedIn(user){
+  // 프로필(이름) 가져오기 — 실패해도 진행
+  try{
+    const { data:profile } = await sb.from('profiles').select('name, role, email').eq('id', user.id).single();
+    _profileName = profile?.name || (user.email||'').split('@')[0];
+    const roleLabel = {admin:'관리자',manager:'실장',user:'사용자'}[profile?.role] || '';
+    $('app-rolabel').textContent = (_profileName ? _profileName : '읽기전용') + (roleLabel?(' · '+roleLabel):'');
+  }catch(_){ _profileName = (user.email||'').split('@')[0]; }
+  $('screen-login').classList.add('hidden');
+  $('screen-app').classList.remove('hidden');
+  $('li-btn').disabled=false; $('li-btn').textContent='로그인';
+  showList();
+  await loadProjects();
+}
+async function doLogout(){
+  if(!confirm('로그아웃하시겠습니까?')) return;
+  await sb.auth.signOut();
+  _projects=[]; _filtered=[];
+  showLogin();
+}
+
+// ════════════════════════════════════════════════
+// 프로젝트 목록
+// ════════════════════════════════════════════════
+async function loadProjects(){
+  $('list-body').innerHTML = '<div class="loading-row"><div class="spinner"></div>불러오는 중…</div>';
+  const { data, error } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
+  if(error){
+    $('list-body').innerHTML = `<div class="empty"><div class="ico">⚠️</div>목록을 불러오지 못했습니다.<br><span style="font-size:12px">${esc(error.message)}</span></div>`;
+    return;
+  }
+  _projects = data || [];
+  buildStatusChips();
+  applyFilters();
+}
+function buildStatusChips(){
+  const counts = {};
+  _projects.forEach(p=>{ const k=projectStatus(p); counts[k]=(counts[k]||0)+1; });
+  $('status-chips').innerHTML = STATUS_FILTERS.map(f=>{
+    const n = f.key==='all' ? _projects.length : (counts[f.key]||0);
+    return `<button class="chip ${_statusFilter===f.key?'on':''}" data-st="${f.key}">${f.label}${n?` <span style="opacity:.7">${n}</span>`:''}</button>`;
+  }).join('');
+  $('status-chips').querySelectorAll('.chip').forEach(c=>{
+    c.onclick = ()=>{ _statusFilter = c.dataset.st; buildStatusChips(); applyFilters(); };
+  });
+}
+function applyFilters(){
+  const q = _searchText.trim().toLowerCase();
+  _filtered = _projects.filter(p=>{
+    if(_statusFilter!=='all' && projectStatus(p)!==_statusFilter) return false;
+    if(!q) return true;
+    const hay = [p.name, p.location, p.client, p.building_type,
+      ...(p.data?.orderItems||[]).slice(0,80).map(it=>it.mark)].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  renderList();
+}
+function pcardHTML(p, i){
+  const { folder, name } = parseFolderName(p.name);
+  const stKey = projectStatus(p); const st = PROJECT_STATUS[stKey];
+  const items = p.data?.orderItems || [];
+  const totalQty = items.reduce((s,it)=>s+(it.cancelled?0:(it.qty||1)),0);
+  const cancelled = items.filter(it=>it.cancelled).length;
+  const amt = p.total_amount!=null ? p.total_amount : items.reduce((s,it)=>s+(it.grandTotal||0)*(it.qty||1),0);
+  const showFolder = _searchText.trim() && folder;  // 검색 결과에선 폴더 경로 표시
+  return `<div class="pcard anim" style="--bar:${st.color};animation-delay:${Math.min(i*35,350)}ms" data-pid="${p.id}">
+    ${showFolder?`<div class="folder">📁 ${esc(folder)}</div>`:''}
+    <div class="dh-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div class="ptitle" style="flex:1">${esc(name)}</div>
+      <span class="status-badge" style="background:${st.bg};color:${st.color}">${st.icon} ${st.label}</span>
+    </div>
+    <div class="prow">
+      ${p.location?`<span class="loc">📍 ${esc(p.location)}</span>`:''}
+      ${p.client?`<span>· ${esc(p.client)}</span>`:''}
+    </div>
+    <div class="pbot">
+      <span class="cnt">${items.length}종 / ${totalQty} set${cancelled?` <span style="color:var(--red)">·취소 ${cancelled}</span>`:''}</span>
+      <span class="amt">${fmtWon(amt)}</span>
+    </div>
+    <div style="text-align:right"><span class="date">${fmtDate(p.updated_at)}</span></div>
+  </div>`;
+}
+function renderList(){
+  const body = $('list-body');
+  const searching = !!_searchText.trim();
+
+  // ── 검색 중: 폴더 무시하고 평면 결과 ──
+  if(searching){
+    $('crumbs').classList.add('hidden');
+    $('list-meta').textContent = `검색 결과 ${_filtered.length}개`;
+    body.innerHTML = _filtered.length
+      ? _filtered.map((p,i)=>pcardHTML(p,i)).join('')
+      : `<div class="empty"><div class="ico">🔍</div>검색 결과가 없습니다.</div>`;
+    body.querySelectorAll('.pcard').forEach(c=> c.onclick = ()=> openDetail(c.dataset.pid));
+    return;
+  }
+
+  // ── 폴더 탐색 모드 ──
+  renderCrumbs();
+  const prefix = _folderPath ? _folderPath + '/' : '';
+  // 현재 폴더에 직접 속한 프로젝트
+  const direct = _filtered.filter(p=> projectFolderPath(p) === _folderPath);
+  // 하위 폴더 집계 (바로 다음 단계 폴더명만)
+  const subMap = {};  // 다음단계폴더명 → {count, full}
+  _filtered.forEach(p=>{
+    const fp = projectFolderPath(p);
+    if(!fp) return;
+    if(_folderPath){
+      if(fp !== _folderPath && !fp.startsWith(prefix)) return;
+      if(fp === _folderPath) return;
+    }
+    const rest = _folderPath ? fp.slice(prefix.length) : fp;
+    const seg = rest.split('/')[0];
+    if(!seg) return;
+    const full = _folderPath ? (prefix + seg) : seg;
+    if(!subMap[seg]) subMap[seg] = { count:0, full };
+    subMap[seg].count++;
+  });
+  const subFoldersAlpha = Object.keys(subMap).sort((a,b)=>a.localeCompare(b,'ko'));
+  const subFolders = orderedSubFolders(subFoldersAlpha, _folderPath);
+
+  $('list-meta').textContent = `폴더 ${subFolders.length} · 현장 ${direct.length}`;
+
+  let html = '';
+  if(subFolders.length){
+    const hasCustom = !!(_folderOrder[_folderPath] && _folderOrder[_folderPath].length);
+    html += `<div class="section-tag" style="display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px"><span>📁 폴더 (${subFolders.length}) · ▲▼로 순서 변경</span>${hasCustom?`<span class="fo-reset" id="fo-reset">↕ 순서 초기화</span>`:''}</div>`;
+    html += subFolders.map((seg,i)=>{
+      const info = subMap[seg];
+      const up = i===0 ? ' disabled' : '';
+      const dn = i===subFolders.length-1 ? ' disabled' : '';
+      return `<div class="fcard anim" style="animation-delay:${Math.min(i*30,300)}ms" data-folder="${esc(info.full)}">
+        <span class="fico">📁</span>
+        <div class="fmain"><div class="fname">${esc(seg)}</div><div class="fsub">현장 ${info.count}개</div></div>
+        <div class="fmove">
+          <button class="fmv up" data-seg="${esc(seg)}"${up}>▲</button>
+          <button class="fmv dn" data-seg="${esc(seg)}"${dn}>▼</button>
+        </div>
+        <span class="farrow">›</span>
+      </div>`;
+    }).join('');
+  }
+  if(direct.length){
+    html += `<div class="section-tag">🏗️ 현장 (${direct.length})</div>`;
+    html += direct.map((p,i)=>pcardHTML(p,i)).join('');
+  }
+  if(!subFolders.length && !direct.length){
+    html += `<div class="empty"><div class="ico">📂</div>${_projects.length?'이 폴더에 항목이 없습니다.':'저장된 현장이 없습니다.'}</div>`;
+  }
+  body.innerHTML = html;
+  body.querySelectorAll('.fcard').forEach(c=> c.onclick = (e)=>{
+    if(e.target.closest('.fmove')) return;   // ▲▼ 버튼 탭은 폴더 열지 않음
+    _folderPath = c.dataset.folder; renderList(); window.scrollTo(0,0);
+  });
+  body.querySelectorAll('.fmv.up').forEach(b=> b.onclick = (e)=>{ e.stopPropagation(); moveFolder(_folderPath, b.dataset.seg, -1, subFolders); });
+  body.querySelectorAll('.fmv.dn').forEach(b=> b.onclick = (e)=>{ e.stopPropagation(); moveFolder(_folderPath, b.dataset.seg, +1, subFolders); });
+  const foReset = $('fo-reset'); if(foReset) foReset.onclick = ()=> resetFolderOrder(_folderPath);
+  body.querySelectorAll('.pcard').forEach(c=> c.onclick = ()=> openDetail(c.dataset.pid));
+}
+function renderCrumbs(){
+  const cr = $('crumbs');
+  cr.classList.remove('hidden');
+  const parts = _folderPath ? _folderPath.split('/').filter(Boolean) : [];
+  let acc = '';
+  let html = `<span class="cr ${parts.length?'':'cur'}" data-path="">🏠 홈</span>`;
+  parts.forEach((seg,i)=>{
+    acc = acc ? (acc+'/'+seg) : seg;
+    const isLast = i===parts.length-1;
+    html += `<span class="sep">›</span><span class="cr ${isLast?'cur':''}" data-path="${esc(acc)}">${esc(seg)}</span>`;
+  });
+  cr.innerHTML = html;
+  cr.querySelectorAll('.cr').forEach(el=>{
+    el.onclick = ()=>{ _folderPath = el.dataset.path; renderList(); window.scrollTo(0,0); };
+  });
+}
+
+// ════════════════════════════════════════════════
+// 프로젝트 상세
+// ════════════════════════════════════════════════
+let _currentDetail = null;
+function openDetail(pid){
+  const p = _projects.find(x=>String(x.id)===String(pid));
+  if(!p) return;
+  _currentDetail = p;
+  showDetail();
+  try{ history.pushState({v:'detail',pid:String(pid)}, ''); }catch(_){}
+  const { folder, name } = parseFolderName(p.name);
+  const items = (p.data?.orderItems)||[];
+  const stKey = projectStatus(p); const st = PROJECT_STATUS[stKey];
+  const totalQty = items.reduce((s,it)=>s+(it.cancelled?0:(it.qty||1)),0);
+  const cancelled = items.filter(it=>it.cancelled).length;
+  const amt = p.total_amount!=null ? p.total_amount : items.reduce((s,it)=>s+(it.grandTotal||0)*(it.qty||1),0);
+
+  // 색상/공통특기사항 (첫 항목 snapshot 기준 — PC 일람표 로직 간소화)
+  const f0 = items[0]||{}; const sn0 = f0.snapshot||{};
+  const COLOR_LABELS = {white:'화이트',black:'블랙',gray:'그레이',silver:'실버',bronze:'브론즈',mocha:'모카',oak:'오크',walnut:'월넛',cherry:'체리',gold:'골드',beige:'베이지'};
+  const colorLabel = (code, fallback)=>{
+    if(code && COLOR_LABELS[code]) return COLOR_LABELS[code];
+    if(code && /[가-힣]/.test(code)) return code.replace(/\s*\([^)]*\)\s*/g,'').trim();
+    return fallback||'';
+  };
+  const colorOut = colorLabel(sn0.colorOut || f0.color, f0.color||'미정');
+  const colorIn  = sn0.colorIn ? colorLabel(sn0.colorIn,'화이트') : '화이트';
+  const notesArr = items.map(it=>(it.notes||it.snapshot?.customerNotes||'').trim());
+  let commonNote=''; if(notesArr.length && notesArr[0] && notesArr.every(n=>n===notesArr[0])) commonNote=notesArr[0];
+
+  $('app-title').textContent = name || '현장';
+  $('app-sub').textContent = folder || '📱 모바일 버전';
+
+  const head = `
+    <div class="detail-head anim">
+      ${folder?`<div class="dh-folder">📁 ${esc(folder)}</div>`:''}
+      <div class="dh-top">
+        <h2 style="flex:1">${esc(name)}</h2>
+        <span class="status-badge" style="background:${st.bg};color:${st.color}">${st.icon} ${st.label}</span>
+      </div>
+      <dl class="dh-grid">
+        ${p.location?`<dt>현장</dt><dd>${esc(p.location)}</dd>`:''}
+        ${p.client?`<dt>업체</dt><dd>${esc(p.client)}</dd>`:''}
+        <dt>수량</dt><dd>${items.length}종 / ${totalQty} set${cancelled?` <span style="color:var(--red)">(취소 ${cancelled})</span>`:''}</dd>
+        <dt>프레임 색상</dt><dd>외부 ${esc(colorOut)} / 내부 ${esc(colorIn)}</dd>
+        <dt>금액</dt><dd style="color:var(--accent2);font-weight:800">${fmtWon(amt)}</dd>
+        <dt>수정일</dt><dd>${fmtDate(p.updated_at)}</dd>
+      </dl>
+    </div>
+    ${commonNote?`<div class="special-note anim"><span>⚠</span><span>특기사항: ${esc(commonNote)}</span></div>`:''}
+    <div class="detail-actions anim">
+      <button class="act-btn act-out" id="btn-output">📤 출력 · 공유</button>
+    </div>
+    <div class="sec-label">창호 도면 (${items.length})</div>
+  `;
+
+  const cards = items.length ? items.map((item,idx)=>windowCardHTML(item,idx)).join('')
+    : `<div class="empty"><div class="ico">🪟</div>저장된 창호 항목이 없습니다.</div>`;
+
+  $('view-detail').innerHTML = head + `<div id="wcards">${cards}</div>`;
+  // 줌 바인딩
+  $('view-detail').querySelectorAll('[data-zoom-idx]').forEach(btn=>{
+    btn.onclick = ()=> openZoom(parseInt(btn.dataset.zoomIdx,10));
+  });
+  // 도면 영역 탭으로도 줌
+  $('view-detail').querySelectorAll('.wc-draw').forEach(d=>{
+    d.onclick = (e)=>{ if(e.target.closest('.wc-zoom'))return; openZoom(parseInt(d.dataset.idx,10)); };
+  });
+  const ob = $('btn-output'); if(ob) ob.onclick = openOutputSheet;
+  window.scrollTo(0,0);
+}
+
+function windowCardHTML(item, idx){
+  const num = (item.displayNum!=null && String(item.displayNum).trim()!=='') ? String(item.displayNum).trim() : String(idx+1);
+  const typeLabel = item.typeDisplay || TYPE_SHORT[item.baseType] || item.baseType || '';
+  const hpl = item.wo && item.wo.handlePosLabel;
+  const showHandle = hpl && item.baseType!=='FIX';
+  const tags = [];
+  if(item.mark) tags.push(`<span class="tag mark">${esc(item.mark)}</span>`);
+  if(item.location) tags.push(`<span class="tag loc">📍 ${esc(item.location)}</span>`);
+  if(item.color) tags.push(`<span class="tag color">${esc(item.color)}</span>`);
+  if(showHandle) tags.push(`<span class="tag handle" style="background:${HANDLE_COLOR[hpl]||'#888'}">핸들 ${esc(hpl)}</span>`);
+  if(item.hasHiddenHinge) tags.push(`<span class="tag" style="background:rgba(122,92,240,.14);color:#5b3fd0">🔩 매립힌지</span>`);
+  if(item.desc) tags.push(`<span class="tag" style="background:#f0efe9;color:#6b7280">${esc(item.desc)}</span>`);
+
+  const cancelNote = item.cancelNote ? ` — ${esc(item.cancelNote)}` : '';
+  const itemNote = item.itemNote ? `<div class="item-note"><span>⚠</span><span>${esc(item.itemNote)}</span></div>` : '';
+
+  return `<div class="wcard anim ${item.cancelled?'cancelled':''}" style="animation-delay:${Math.min(idx*45,500)}ms">
+    ${item.cancelled?`<div class="cancel-banner"><span>❌</span><span>취소됨${cancelNote}</span></div>`:''}
+    <div class="wc-top">
+      <span class="wc-num">${esc(num)}</span>
+      <span class="wc-type">${esc(typeLabel)}</span>
+      <span class="wc-size mono">${esc(item.W)}×${esc(item.H)}</span>
+      <span class="wc-qty mono">${item.qty||1} set</span>
+    </div>
+    <div class="wc-draw" data-idx="${idx}">
+      ${itemDrawingHTML(item)}
+      <button class="wc-zoom" data-zoom-idx="${idx}" title="크게 보기">⤢</button>
+    </div>
+    ${tags.length?`<div class="wc-tags">${tags.join('')}</div>`:''}
+    ${itemNote}
+  </div>`;
+}
+
+// ════════════════════════════════════════════════
+// 줌 오버레이
+// ════════════════════════════════════════════════
+let _zoomScale = 1;
+function openZoom(idx){
+  const items = (_currentDetail?.data?.orderItems)||[];
+  const item = items[idx]; if(!item) return;
+  const num = (item.displayNum!=null && String(item.displayNum).trim()!=='') ? String(item.displayNum).trim() : String(idx+1);
+  $('zoom-title').textContent = `${num}. ${item.typeDisplay||item.baseType||''}  ${item.W}×${item.H}${item.qty>1?'  ×'+item.qty:''}`;
+  $('zoom-inner').innerHTML = itemDrawingHTML(item, { maxH:'none' });
+  _zoomScale = 1; applyZoom();
+  $('zoom').classList.add('on');
+  try{ history.pushState({v:'zoom'}, ''); }catch(_){}
+}
+function applyZoom(){
+  $('zoom-inner').style.transform = `scale(${_zoomScale})`;
+  $('zoom-reset').textContent = Math.round(_zoomScale*100)+'%';
+}
+function closeZoom(){ $('zoom').classList.remove('on'); }
+
+// ════════════════════════════════════════════════
+// 출력 · 공유 (창호 일람표 / 견적서)
+// ════════════════════════════════════════════════
+const TYPE_LABEL_FULL = {
+  FIX:'FIX (고정창)', TS:'T/S (윗열기+미닫이)', TSTS:'T/S 양개', DOOR:'시스템 도어',
+  TT:'T/T (윗열기+여닫이)', TTFIX:'T/T + FIX', TTTT:'T/T 양개', TO:'T/O (틸트)', PROJ:'프로젝트창'
+};
+function projDocMeta(p){
+  const { name } = parseFolderName(p.name);
+  const items = (p.data?.orderItems)||[];
+  const f0 = items[0]||{}; const sn0 = f0.snapshot||{};
+  const CL = {white:'화이트',black:'블랙',gray:'그레이',silver:'실버',bronze:'브론즈',mocha:'모카',oak:'오크',walnut:'월넛',cherry:'체리',gold:'골드',beige:'베이지'};
+  const lab=(c,fb)=>{ if(c&&CL[c])return CL[c]; if(c&&/[가-힣]/.test(c))return c.replace(/\s*\([^)]*\)\s*/g,'').trim(); return fb||''; };
+  const totalQty = items.reduce((s,it)=>s+(it.cancelled?0:(it.qty||1)),0);
+  const cancelled = items.filter(it=>it.cancelled).length;
+  const notesArr = items.map(it=>(it.notes||it.snapshot?.customerNotes||'').trim());
+  let commonNote=''; if(notesArr.length&&notesArr[0]&&notesArr.every(n=>n===notesArr[0])) commonNote=notesArr[0];
+  return {
+    name, items, totalQty, cancelled, commonNote,
+    site:p.location||f0.site||'', company:p.client||f0.company||'',
+    colorOut:lab(sn0.colorOut||f0.color, f0.color||'미정'),
+    colorIn: sn0.colorIn?lab(sn0.colorIn,'화이트'):'화이트',
+    today:new Date().toLocaleDateString('ko-KR')
+  };
+}
+function dispNum(item, idx){ return (item.displayNum!=null&&String(item.displayNum).trim()!=='')?String(item.displayNum).trim():String(idx+1); }
+
+// ── 창호 일람표 HTML (화면/인쇄 공용) ──
+function buildScheduleHTML(p){
+  const m = projDocMeta(p);
+  const cells = m.items.map((it,idx)=>{
+    const typeL = it.typeDisplay || TYPE_LABEL_FULL[it.baseType] || it.baseType || '';
+    const hpl = it.wo&&it.wo.handlePosLabel&&it.baseType!=='FIX' ? esc(it.wo.handlePosLabel) : '';
+    const qty = it.qty||1;
+    return `<div class="scell ${it.cancelled?'cxl':''}">
+      <div class="sc-top"><span class="sc-num">${esc(dispNum(it,idx))}</span><span class="sc-type">${esc(typeL)}</span><span class="sc-size">${esc(it.W)}×${esc(it.H)}</span></div>
+      <div class="sc-draw">${itemDrawingHTML(it,{maxH:'200px'})}</div>
+      <div class="sc-info">
+        ${it.cancelled?`<span style="color:#c00;font-weight:800;width:100%">[취소]${it.cancelNote?' '+esc(it.cancelNote):''}</span>`:''}
+        <span><b>부호</b> ${esc(it.mark||'-')}</span>
+        <span><b>위치</b> ${esc(it.location||'-')}</span>
+        <span style="color:#b8000a"><b>수량</b> ${qty} set</span>
+        <span><b>색상</b> ${esc(it.color||'-')}</span>
+        ${hpl?`<span><b>핸들</b> ${hpl}</span>`:''}
+        ${it.desc?`<span><b>구분</b> ${esc(it.desc)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="gdoc">
+    ${m.commonNote?`<div class="gnote">⚠ 특기사항: ${esc(m.commonNote)}</div>`:''}
+    <div class="ghead">
+      <div class="hl">일자 : ${esc(m.today)}<br>현장 : ${esc(m.site)}${m.company?` (${esc(m.company)})`:''}<br>기준 : 내관도</div>
+      <div class="hc"><div class="brand">DECCO KOREA</div><h1>창호 일람표</h1><div class="sub">DECCO · 실제작 사이즈</div></div>
+      <div class="hr">모델 : DECCO<br>수량 : ${m.totalQty} set${m.cancelled?` (취소 ${m.cancelled})`:''}<br>색상 : 외 ${esc(m.colorOut)} / 내 ${esc(m.colorIn)}</div>
+    </div>
+    <div class="sched-grid">${cells||'<div style="padding:30px;text-align:center;color:#999">창호 항목이 없습니다.</div>'}</div>
+    <div class="gfoot"><span>※ 발주 전 사이즈·핸들 방향·수량을 반드시 확인하세요.</span><span>DECCO</span></div>
+  </div>`;
+}
+
+// ── 견적서 HTML (화면/인쇄 공용) ──
+function buildQuoteHTML(p){
+  const m = projDocMeta(p);
+  let sum = 0;
+  const rows = m.items.map((it,idx)=>{
+    const typeL = it.typeDisplay || TYPE_LABEL_FULL[it.baseType] || it.baseType || '';
+    const mk = [it.mark, it.location].filter(Boolean).join('/');
+    const qty = it.qty||1;
+    const unit = it.unitTotal!=null ? it.unitTotal : (it.grandTotal!=null?Math.round(it.grandTotal):0);
+    const line = it.cancelled ? 0 : (it.grandTotal!=null ? Math.round(it.grandTotal*qty) : unit*qty);
+    if(!it.cancelled) sum += line;
+    return `<tr class="${it.cancelled?'cxl':''}">
+      <td>${esc(dispNum(it,idx))}</td><td>${esc(typeL)}</td><td>${esc(mk||'-')}</td>
+      <td>${esc(it.W)}×${esc(it.H)}</td><td>${qty}</td>
+      <td style="text-align:right">${unit?unit.toLocaleString('ko-KR'):'-'}</td>
+      <td style="text-align:right">${it.cancelled?'<span style="color:#c00">취소</span>':line.toLocaleString('ko-KR')}</td>
+    </tr>`;
+  }).join('');
+  const vat = Math.round(sum*0.1);
+  return `<div class="gdoc">
+    <div class="ghead">
+      <div class="hl">일자 : ${esc(m.today)}<br>현장 : ${esc(m.site)}<br>${m.company?`업체 : ${esc(m.company)}`:''}</div>
+      <div class="hc"><div class="brand">DECCO KOREA</div><h1>견 적 서</h1><div class="sub">DECCO SYSTEM WINDOW</div></div>
+      <div class="hr">수량 : ${m.totalQty} set<br>색상 : 외 ${esc(m.colorOut)}<br>내 ${esc(m.colorIn)}</div>
+    </div>
+    <table>
+      <thead><tr><th style="width:34px">No</th><th>제품</th><th>부호/위치</th><th>사이즈</th><th style="width:34px">수량</th><th>단가</th><th>금액</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="padding:24px;color:#999">항목 없음</td></tr>'}</tbody>
+      <tfoot>
+        <tr><td colspan="6" style="text-align:right">공급가액</td><td style="text-align:right">${sum.toLocaleString('ko-KR')}</td></tr>
+        <tr><td colspan="6" style="text-align:right">부가세 (10%)</td><td style="text-align:right">${vat.toLocaleString('ko-KR')}</td></tr>
+        <tr class="qtot"><td colspan="6" style="text-align:right">합계 (VAT 포함)</td><td style="text-align:right">₩${(sum+vat).toLocaleString('ko-KR')}</td></tr>
+      </tfoot>
+    </table>
+    <div class="gfoot"><span>※ 본 견적은 저장된 단가 기준이며, 최종 금액은 PC에서 확인하세요.</span><span>DECCO</span></div>
+  </div>`;
+}
+
+let _curDocType = 'schedule';
+let _docMode = 'native';   // 'native'(모바일생성) | 'baked'(PC출력물)
+
+function moExpired(mo){ return !!(mo && mo.expiresAt && new Date(mo.expiresAt).getTime() <= Date.now()); }
+function moRemainLabel(mo){
+  if(!mo || !mo.expiresAt) return '';
+  const ms = new Date(mo.expiresAt).getTime() - Date.now();
+  if(ms <= 0) return '만료됨';
+  const h = Math.floor(ms/3600000), mn = Math.floor((ms%3600000)/60000);
+  return h>0 ? `${h}시간 후 자동삭제` : `${mn}분 후 자동삭제`;
+}
+function mobileOutputs(){
+  const mo = _currentDetail?.data?._mobileOutputs;
+  if(!mo) return null;
+  if(moExpired(mo)){ clearMobileOutputs('expired'); return null; }
+  return mo;
+}
+// 임시 출력물 비우기 (만료 자동 / 수동) — _mobileOutputs 필드만 제거, 견적 데이터는 보존
+let _clearingMO = false;
+async function clearMobileOutputs(reason){
+  const p = _currentDetail;
+  if(!p || !p.data || !p.data._mobileOutputs || _clearingMO) return;
+  _clearingMO = true;
+  try{
+    delete p.data._mobileOutputs;                       // 로컬 즉시 반영
+    const cached = _projects.find(x=>String(x.id)===String(p.id));
+    if(cached && cached.data) delete cached.data._mobileOutputs;
+    const { data: row } = await sb.from('projects').select('data').eq('id', p.id).single();
+    const nd = Object.assign({}, row?.data || {});
+    delete nd._mobileOutputs;
+    await sb.from('projects').update({ data: nd }).eq('id', p.id);
+  }catch(e){ console.error('[clearMO]', e); }
+  _clearingMO = false;
+  if(reason==='manual'){ toast('🗑 임시 출력물을 비웠습니다'); openOutputSheet(); }
+}
+
+const PC_OUTPUTS = [
+  { kind:'schedule',  title:'창호 일람표',          icon:'📋' },
+  { kind:'quote',     title:'견적서',                icon:'🧾' },
+  { kind:'cut',       title:'절단 리스트',           icon:'✂️' },
+  { kind:'glass',     title:'유리 리스트',           icon:'🪟' },
+  { kind:'screen',    title:'방충망 리스트',         icon:'🦟' },
+  { kind:'workorder', title:'작업지시서',            icon:'🏭' },
+  { kind:'frameinner',title:'프레임 외부 내경 사이즈',icon:'📐' },
+  { kind:'gb',        title:'GB 절단 리스트',        icon:'📏' },
+  { kind:'label',     title:'라벨 출력 리스트',      icon:'🏷️' },
+  { kind:'quotesvg',  title:'견적서 (도면)',         icon:'🖼️' },
+  { kind:'cost',      title:'원가 검토',             icon:'🔍' },
+  { kind:'mat',       title:'현장 자재 합계',        icon:'📊' }
+];
+function openOutputSheet(){
+  let html = `<div class="section-tag" style="margin:2px 2px 8px">업체에 보낼 출력물 (PC와 100% 동일)</div>`;
+  html += PC_OUTPUTS.map(o=>`<button class="out-item ready" data-kind="${o.kind}"><span class="oico">${o.icon}</span><span class="otxt">${o.title}</span><span class="obadge">PDF·공유</span></button>`).join('');
+  html += `<div class="sheet-note">📱 모든 출력물은 PC 견적 시스템과 동일한 계산·서식으로 <b>이 자리에서 바로</b> 만들어집니다. 항목을 누르면 생성 후 PDF·이미지로 업체에 보낼 수 있어요. (첫 생성은 몇 초 걸릴 수 있습니다.)</div>`;
+  $('sheet-list').innerHTML = html;
+  $('sheet-bg').classList.add('on');
+  try{ history.pushState({v:'sheet'}, ''); }catch(_){}
+  $('sheet-list').querySelectorAll('.out-item.ready').forEach(b=>{
+    b.onclick = ()=>{
+      const o = PC_OUTPUTS.find(x=>x.kind===b.dataset.kind);
+      closeSheet();
+      openEngineDoc(o.kind, o.title);
+      try{ history.replaceState({v:'doc'}, ''); }catch(_){}
+    };
+  });
+}
+function closeSheet(){ $('sheet-bg').classList.remove('on'); }
+
+// 액션바 버튼 모드별 설정
+function setDocActions(mode){
+  const pdf=$('doc-pdf'), img=$('doc-img'), prn=$('doc-print');
+  if(mode==='baked'){
+    pdf.textContent='📄 PDF 보내기'; pdf.style.display=''; pdf.onclick=sharePdfFromBaked;
+    img.textContent='🖼 이미지'; img.style.display=''; img.onclick=shareBakedImage;
+    prn.textContent='🖨 인쇄'; prn.style.display=''; prn.onclick=printBaked;
+  }else{
+    pdf.textContent='📄 PDF 보내기'; pdf.style.display=''; pdf.onclick=()=>shareDoc('pdf');
+    img.textContent='🖼 이미지'; img.style.display=''; img.onclick=()=>shareDoc('png');
+    prn.textContent='🖨 인쇄'; prn.style.display=''; prn.onclick=printDoc;
+  }
+}
+
+// 모바일 생성 문서 (일람표/견적서)
+function openDoc(type){
+  if(!_currentDetail) return;
+  _docMode='native'; _curDocType = type;
+  const m = projDocMeta(_currentDetail);
+  const isQ = type==='quote';
+  $('doc-title').textContent = (isQ?'견적서':'창호 일람표') + (m.name?` · ${m.name}`:'');
+  $('doc-paper').innerHTML = isQ ? buildQuoteHTML(_currentDetail) : buildScheduleHTML(_currentDetail);
+  setDocActions('native');
+  $('docview').classList.add('on');
+}
+// ════════════════════════════════════════════════
+// PC 엔진 재사용 — 숨겨진 index.html에서 PC와 동일한 출력물 생성
+// ════════════════════════════════════════════════
+let _engineReady = null, _engineLoadedId = null;
+function ensureEngine(){
+  if(_engineReady) return _engineReady;
+  _engineReady = new Promise((resolve, reject)=>{
+    const fr = document.createElement('iframe');
+    fr.id = 'engine-frame';
+    fr.setAttribute('aria-hidden','true');
+    fr.style.cssText = 'position:fixed;left:-99999px;top:0;width:1180px;height:1500px;border:0;visibility:hidden;pointer-events:none';
+    fr.src = '/index.html';   // 같은 도메인 루트에 배포된 PC 앱
+    let tries = 0, onloaded = false;
+    const neutralize = (cw)=>{ try{ cw.confirm=()=>true; cw.alert=()=>{}; cw.showToast=()=>{}; cw.print=()=>{}; }catch(_){} };
+    const snap = ()=>{
+      let cw=null; try{ cw=fr.contentWindow; }catch(_){}
+      let path='?'; try{ path = cw && cw.location ? (cw.location.pathname||'/') : '(접근불가)'; }catch(_){ path='(타도메인)'; }
+      const has = n => { try{ return cw && typeof cw[n]==='function'; }catch(_){ return false; } };
+      return { cw:!!cw, path,
+        load: has('loadFromCloud'), sched: has('getBatchScheduleHTML'),
+        quote: has('getBatchQuoteHTML'), cut: has('getBatchCutListHTML') };
+    };
+    const poll = ()=>{
+      tries++;
+      let cw=null; try{ cw = fr.contentWindow; }catch(_){}
+      if(cw) neutralize(cw);
+      try{ if(cw && cw.location && /login/i.test(cw.location.pathname)){ reject(new Error('PC 앱이 로그인 화면으로 이동했습니다.\n모바일(이 브라우저)에 먼저 로그인되어 있어야 합니다.')); return; } }catch(_){}
+      // ✅ 준비 판정: 함수 선언은 window에 올라가므로 그것으로 확인 (_supabase는 const라 window에 없음)
+      if(cw && typeof cw.loadFromCloud==='function' && typeof cw.getBatchScheduleHTML==='function' && typeof cw.getBatchQuoteHTML==='function'){
+        neutralize(cw);
+        resolve(cw); return;
+      }
+      if(tries > 260){
+        const s = snap();
+        reject(new Error('PC 엔진 로드 시간 초과\n\n[진단] onload:'+(onloaded?'O':'X')+' · 창:'+(s.cw?'O':'X')+' · 경로:'+s.path+'\n함수 → loadFromCloud:'+(s.load?'O':'X')+' / 일람표:'+(s.sched?'O':'X')+' / 견적:'+(s.quote?'O':'X')+' / 절단:'+(s.cut?'O':'X')));
+        return;
+      }
+      setTimeout(poll, tries<40 ? 60 : 150);   // ≈ 최대 35초
+    };
+    fr.onload = ()=>{ onloaded = true; poll(); };
+    setTimeout(poll, 50);   // onload 전에도 폴링 시작 (팝업 선점)
+    fr.onerror = ()=> reject(new Error('PC 앱(index.html)을 불러오지 못했습니다'));
+    document.body.appendChild(fr);
+  }).catch(e=>{ _engineReady=null; throw e; });
+  return _engineReady;
+}
+async function genPcOutput(kind){
+  const cw = await ensureEngine();
+  if(_engineLoadedId !== _currentDetail.id){
+    await cw.loadFromCloud(_currentDetail.id);   // orderItems 등 PC 상태 세팅 (confirm/alert 무력화됨)
+    _engineLoadedId = _currentDetail.id;
+  }
+  switch(kind){
+    case 'schedule': return await cw.getBatchScheduleHTML();
+    case 'quote':    return cw.getBatchQuoteHTML(false);
+    case 'quotesvg': return cw.getBatchQuoteHTML(true);
+    case 'workorder':return cw.getBatchWorkOrderHTML();
+    case 'cut':      return cw.getBatchCutListHTML();
+    case 'glass':    return cw.getBatchGlassHTML({glass:true, screen:false});
+    case 'screen':   return cw.getBatchGlassHTML({glass:false, screen:true, frameInner:false});
+    case 'frameinner':return cw.getBatchGlassHTML({glass:false, screen:true, frameInner:true, frameInnerOnly:true});
+    case 'gb':       return cw.buildGBListHTML();
+    case 'label':    return cw.buildLabelListHTML();
+    case 'cost':     return cw.buildCostReviewHTML();
+    case 'mat':      return cw.buildMaterialSummaryHTML();
+  }
+  return '';
+}
+
+// HTML 문서를 뷰어에 표시 (iframe srcdoc + 화면폭 맞춤)
+function renderHtmlIntoDocPaper(html){
+  const safe = String(html||'').replace(/<script[\s\S]*?<\/script>/gi,'');
+  const srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:6px 8px;background:#fff;font-family:'Malgun Gothic','Noto Sans KR',sans-serif;color:#111}</style></head><body>${safe}</body></html>`;
+  $('doc-paper').innerHTML = `<div id="baked-wrap" style="overflow:hidden;background:#fff"><iframe id="baked-frame" style="width:800px;border:0;display:block;background:#fff" scrolling="no"></iframe></div>`;
+  const fr = $('baked-frame');
+  fr.onload = ()=>{
+    try{
+      const d = fr.contentDocument;
+      const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight, 400);
+      fr.style.height = (h+12)+'px';
+      const wrap = $('baked-wrap');
+      const scale = Math.min(1, (wrap.clientWidth||720)/800);
+      fr.style.transformOrigin='top left';
+      fr.style.transform = `scale(${scale})`;
+      wrap.style.height = ((h+12)*scale)+'px';
+    }catch(_){ fr.style.height='1400px'; }
+  };
+  fr.srcdoc = srcdoc;
+}
+
+// 출력물 열기 (PC 엔진으로 생성 → 표시)
+async function openEngineDoc(kind, title){
+  if(!_currentDetail) return;
+  _docMode = 'baked';
+  const m = projDocMeta(_currentDetail);
+  $('doc-title').textContent = title + (m.name?` · ${m.name}`:'');
+  $('doc-paper').innerHTML = '';
+  setDocActions('baked');
+  $('docview').classList.add('on');
+  $('doc-busy').classList.add('on'); $('doc-busy-txt').textContent = 'PC와 동일하게 생성 중…';
+  try{
+    const html = await genPcOutput(kind);
+    $('doc-busy').classList.remove('on');
+    if(!html || html.length < 40){ throw new Error('생성된 내용이 없습니다 (저장된 데이터 확인 필요)'); }
+    renderHtmlIntoDocPaper(html);
+  }catch(e){
+    $('doc-busy').classList.remove('on');
+    console.error('[openEngineDoc]', e);
+    $('doc-paper').innerHTML = `<div style="padding:28px 20px;color:#a33;font-size:13.5px;line-height:1.7"><b>⚠ 출력물을 만들지 못했습니다.</b><br>${esc(e.message||String(e)).replace(/\n/g,'<br>')}<br><br>· PC 앱(<code>index.html</code>)이 같은 주소에 배포돼 있어야 합니다.<br>· 모바일에 <b>로그인</b>되어 있어야 합니다.</div>`;
+  }
+}
+let _curBakedIdx = -1;
+function closeDoc(){ $('docview').classList.remove('on'); $('doc-paper').innerHTML=''; }
+
+// ── 인쇄 / PDF (모바일 생성 문서 — 현재 미사용, 호환 유지) ──
+function printDoc(){
+  $('print-area').innerHTML = $('doc-paper').innerHTML;
+  document.body.classList.add('printing');
+  const cleanup = ()=>{ document.body.classList.remove('printing'); $('print-area').innerHTML=''; window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(()=>{ window.print(); }, 60);
+  setTimeout(cleanup, 60000);
+}
+// ── 인쇄 (iframe 자체 인쇄 → PC와 동일한 A4 레이아웃 그대로 PDF 저장) ──
+function printBaked(){
+  const fr = $('baked-frame');
+  if(!fr || !fr.contentWindow){ alert('문서를 불러오는 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+  catch(e){ console.error('[printBaked]', e); alert('인쇄를 시작하지 못했습니다. "이미지 보내기"를 이용해 보세요.'); }
+}
+// ── 이미지로 공유 (html2canvas 지연 로드) ──
+let _h2cLoading = null;
+function ensureHtml2Canvas(){
+  if(window.html2canvas) return Promise.resolve();
+  if(_h2cLoading) return _h2cLoading;
+  _h2cLoading = new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=()=>res(); s.onerror=()=>rej(new Error('이미지 변환 라이브러리 로드 실패'));
+    document.head.appendChild(s);
+  });
+  return _h2cLoading;
+}
+async function shareBakedImage(){
+  const busy=$('doc-busy'), btxt=$('doc-busy-txt');
+  busy.classList.add('on'); btxt.textContent='이미지 만드는 중…';
+  const m=projDocMeta(_currentDetail);
+  const ttl=($('doc-title').textContent||'출력물').split('·')[0].trim();
+  const base=`${(m.name||'DECCO').replace(/[\\/:*?"<>|]/g,'_')}_${ttl.replace(/[\\/:*?"<>|]/g,'_')}`;
+  try{
+    await ensureHtml2Canvas();
+    const fr=$('baked-frame'); const doc=fr.contentDocument;
+    const target=doc.body;
+    const canvas=await window.html2canvas(target,{scale:2,backgroundColor:'#fff',windowWidth:800,width:Math.max(800,target.scrollWidth)});
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    busy.classList.remove('on');
+    const file=new File([blob], base+'.png', {type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:base});
+    }else{
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=base+'.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+      alert('이미지를 저장했습니다.\n다운로드 폴더에서 카톡으로 공유하세요.');
+    }
+  }catch(e){
+    busy.classList.remove('on');
+    if(e && /share|abort|cancel/i.test(e.name||'')) return;
+    console.error('[shareBakedImage]', e);
+    alert('이미지를 만들지 못했습니다.\n"🖨 인쇄 · PDF"로 PDF를 저장해 보내주세요.');
+  }
+}
+
+// ── PC 출력물 PDF로 공유 (html2canvas → jsPDF A4 분할 → 공유 시트) ──
+async function sharePdfFromBaked(){
+  const busy=$('doc-busy'), btxt=$('doc-busy-txt');
+  busy.classList.add('on'); btxt.textContent='PDF 만드는 중…';
+  const m=projDocMeta(_currentDetail);
+  const ttl=($('doc-title').textContent||'출력물').split('·')[0].trim();
+  const base=`${(m.name||'DECCO').replace(/[\\/:*?"<>|]/g,'_')}_${ttl.replace(/[\\/:*?"<>|]/g,'_')}`;
+  try{
+    await ensureHtml2Canvas();
+    await ensureJsPDF();
+    const fr=$('baked-frame'); const doc=fr.contentDocument; const target=doc.body;
+    const canvas=await window.html2canvas(target,{scale:2,backgroundColor:'#fff',windowWidth:800,width:Math.max(800,target.scrollWidth)});
+    const { jsPDF }=window.jspdf;
+    const pdf=new jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true});
+    const pageW=210, margin=8, cw=pageW-2*margin;
+    const pxPerMm=canvas.width/cw;
+    const pageHpx=Math.floor((297-2*margin)*pxPerMm);
+    let y=0, page=0;
+    while(y<canvas.height){
+      const sliceH=Math.min(pageHpx, canvas.height-y);
+      const tmp=document.createElement('canvas'); tmp.width=canvas.width; tmp.height=sliceH;
+      const ctx=tmp.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,tmp.width,tmp.height);
+      ctx.drawImage(canvas, 0,y,canvas.width,sliceH, 0,0,canvas.width,sliceH);
+      const data=tmp.toDataURL('image/jpeg',0.92);
+      if(page>0) pdf.addPage();
+      pdf.addImage(data,'JPEG',margin,margin,cw,sliceH/pxPerMm);
+      y+=sliceH; page++;
+    }
+    const blob=pdf.output('blob');
+    busy.classList.remove('on');
+    const file=new File([blob], base+'.pdf', {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:base});
+    }else{
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=base+'.pdf';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+      alert('PDF를 저장했습니다.\n다운로드 폴더에서 카톡으로 공유하세요.');
+    }
+  }catch(e){
+    busy.classList.remove('on');
+    if(e && /share|abort|cancel/i.test(e.name||'')) return;
+    console.error('[sharePdfFromBaked]', e);
+    alert('PDF를 만들지 못했습니다.\n"🖼 이미지"로 보내거나 "🖨 인쇄"로 저장해 보세요.');
+  }
+}
+
+// ── SVG 문자열 → 캔버스 (네이티브, 라이브러리 불필요) ──
+function svgStringToCanvas(svgString, scale){
+  return new Promise((resolve, reject)=>{
+    try{
+      const svg = svgString.indexOf('xmlns=')>=0 ? svgString : svgString.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"');
+      const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = ()=>{
+        const w = img.naturalWidth||img.width, h = img.naturalHeight||img.height;
+        const s = scale || 2;
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(w*s); cv.height = Math.round(h*s);
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+        ctx.drawImage(img,0,0,cv.width,cv.height);
+        URL.revokeObjectURL(url);
+        resolve(cv);
+      };
+      img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(new Error('SVG 이미지 변환 실패')); };
+      img.src = url;
+    }catch(e){ reject(e); }
+  });
+}
+async function svgStringToPng(svgString, scale){
+  const cv = await svgStringToCanvas(svgString, scale);
+  return cv.toDataURL('image/png');
+}
+
+// ── jsPDF 지연 로드 ──
+let _jspdfLoading = null;
+function ensureJsPDF(){
+  if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if(_jspdfLoading) return _jspdfLoading;
+  _jspdfLoading = new Promise((resolve,reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = ()=> resolve();
+    s.onerror = ()=> reject(new Error('PDF 라이브러리를 불러오지 못했습니다 (네트워크 확인)'));
+    document.head.appendChild(s);
+  });
+  return _jspdfLoading;
+}
+// ── 합성 페이지들 → PDF Blob (페이지당 1장, 줄 경계로 분할 · 한글 폰트 문제 없음) ──
+async function buildSharePdfBlob(p, type){
+  await ensureJsPDF();
+  const pages = buildDocPages(p, type);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'p', unit:'mm', format:'a4', compress:true });
+  const pageW = 210, margin = 8, cw = pageW - margin*2, maxH = 297 - margin*2;
+  for(let i=0;i<pages.length;i++){
+    const cv = await svgStringToCanvas(pageToSVG(pages[i]), 2);
+    const data = cv.toDataURL('image/jpeg', 0.92);
+    const hmm = Math.min(cw*cv.height/cv.width, maxH);
+    if(i>0) pdf.addPage();
+    pdf.addImage(data, 'JPEG', margin, margin, cw, hmm);
+  }
+  return pdf.output('blob');
+}
+
+// ── A4 페이지 단위 문서 생성 (일람표/견적서) ──
+const PAGE_W = 1240, PAGE_H = 1754, PAD = 40;   // A4 세로 비율(210:297)
+function docHeaderSVG(m, title, sub, isFirst, pageNum, totalPages){
+  if(isFirst){
+    return { markup:`
+      <text x="${PAGE_W/2}" y="52" font-size="32" font-weight="900" text-anchor="middle" fill="#16233f">${title}</text>
+      <text x="${PAGE_W/2}" y="80" font-size="15" text-anchor="middle" fill="#888">${sub}</text>
+      <text x="${PAD}" y="116" font-size="17" fill="#333">일자 : ${esc(m.today)}   현장 : ${esc(m.site)}${m.company?`  (${esc(m.company)})`:''}</text>
+      <text x="${PAGE_W-PAD}" y="116" font-size="17" text-anchor="end" fill="#333">수량 ${m.totalQty} set · 색상 외 ${esc(m.colorOut)}/내 ${esc(m.colorIn)}</text>
+      <line x1="${PAD}" y1="140" x2="${PAGE_W-PAD}" y2="140" stroke="#16233f" stroke-width="2.5"/>
+      ${totalPages>1?`<text x="${PAGE_W-PAD}" y="160" font-size="12" text-anchor="end" fill="#999">${pageNum} / ${totalPages}</text>`:''}`,
+      contentTop:172 };
+  }
+  return { markup:`
+    <text x="${PAD}" y="44" font-size="20" font-weight="900" fill="#16233f">${title}</text>
+    <text x="${PAGE_W-PAD}" y="44" font-size="13" text-anchor="end" fill="#999">${pageNum} / ${totalPages}</text>
+    <line x1="${PAD}" y1="58" x2="${PAGE_W-PAD}" y2="58" stroke="#16233f" stroke-width="2"/>`,
+    contentTop:86 };
+}
+function pageWrap(body){
+  return `<rect width="${PAGE_W}" height="${PAGE_H}" fill="#fff"/>${body}<text x="${PAGE_W/2}" y="${PAGE_H-22}" font-size="11" text-anchor="middle" fill="#aaa">DECCO · 발주 전 사이즈 · 수량 · 핸들 방향을 반드시 확인하세요</text>`;
+}
+function pageToSVG(pg){
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${pg.W}" height="${pg.H}" viewBox="0 0 ${pg.W} ${pg.H}" font-family="'Noto Sans KR',sans-serif">${pg.body}</svg>`;
+}
+function scheduleCellSVG(it, idx, x, y, W, H){
+  const TOP=36, INFO=94, DRAW=H-TOP-INFO;
+  const typeL = it.typeDisplay || TYPE_LABEL_FULL[it.baseType] || it.baseType || '';
+  const hpl = it.wo&&it.wo.handlePosLabel&&it.baseType!=='FIX' ? esc(it.wo.handlePosLabel) : '';
+  const cs = cleanSvg(it.wo); const op = it.cancelled?' opacity="0.55"':'';
+  const qty = it.qty||1;
+  let draw;
+  if(it.wo&&it.wo.customImgData) draw=`<image x="${x+10}" y="${y+TOP+6}" width="${W-20}" height="${DRAW-12}" preserveAspectRatio="xMidYMid meet" href="${it.wo.customImgData}"/>`;
+  else if(cs) draw=`<svg x="${x+10}" y="${y+TOP+6}" width="${W-20}" height="${DRAW-12}" viewBox="${esc(cs.vb)}" preserveAspectRatio="xMidYMid meet">${cs.inner}</svg>`;
+  else draw=`<text x="${x+W/2}" y="${y+TOP+DRAW/2}" font-size="18" text-anchor="middle" fill="#bbb">도면 없음</text>`;
+  // 정보 영역 (2단 라벨)
+  const iy = y+TOP+DRAW;            // 정보 영역 상단
+  const LX = x+12, RX = x+W/2+6;    // 좌/우 컬럼 x
+  const kv = (lx, ky, label, val, valFill) => val ? `<text x="${lx}" y="${ky}" font-size="13" fill="#8a93a3">${label}</text><text x="${lx+44}" y="${ky}" font-size="14" font-weight="700" fill="${valFill||'#16233f'}">${esc(val)}</text>` : '';
+  return `<g${op}>
+    <rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#fff" stroke="#99a" stroke-width="1.5" rx="6"/>
+    <rect x="${x}" y="${y}" width="${W}" height="${TOP}" fill="#eef1f7"/>
+    <rect x="${x+10}" y="${y+8}" width="46" height="20" rx="5" fill="#e8141e"/>
+    <text x="${x+33}" y="${y+22}" font-size="15" font-weight="900" text-anchor="middle" fill="#fff">${esc(dispNum(it,idx))}</text>
+    <text x="${x+64}" y="${y+22}" font-size="15" font-weight="800" fill="#16233f">${esc(typeL)}</text>
+    <text x="${x+W-12}" y="${y+22}" font-size="15" font-weight="800" text-anchor="end" fill="#16233f">${esc(it.W)}×${esc(it.H)}</text>
+    ${draw}
+    <line x1="${x}" y1="${iy}" x2="${x+W}" y2="${iy}" stroke="#dde" stroke-width="1"/>
+    ${it.cancelled?`<text x="${LX}" y="${iy+20}" font-size="13" font-weight="800" fill="#c00">[취소]${it.cancelNote?' '+esc(it.cancelNote):''}</text>`:''}
+    ${kv(LX, iy+(it.cancelled?40:22), '부호', it.mark||'-')}
+    ${kv(RX, iy+(it.cancelled?40:22), '위치', it.location||'-')}
+    ${kv(LX, iy+(it.cancelled?60:44), '수량', qty+' set', '#b8000a')}
+    ${kv(RX, iy+(it.cancelled?60:44), '색상', it.color||'-')}
+    ${kv(LX, iy+(it.cancelled?80:66), '핸들', hpl||'-')}
+    ${kv(RX, iy+(it.cancelled?80:66), '구분', it.desc||typeL)}
+  </g>`;
+}
+function buildSchedulePages(p){
+  const m = projDocMeta(p); const items = m.items;
+  const COLS=2, RPP=3, PERPAGE=COLS*RPP, GAP=20;
+  const totalPages = Math.max(1, Math.ceil(items.length/PERPAGE));
+  const CELL_W = (PAGE_W-2*PAD-GAP)/COLS;
+  const CELL_H = ((PAGE_H-50-172)-GAP*(RPP-1))/RPP;   // 1페이지 기준으로 고정 (모든 페이지 동일)
+  const pages = [];
+  for(let pg=0; pg<totalPages; pg++){
+    const hd = docHeaderSVG(m, '창호 일람표', 'DECCO · 실제작 사이즈 · 내관도 기준', pg===0, pg+1, totalPages);
+    const top = hd.contentTop;
+    let cells = '';
+    for(let k=0;k<PERPAGE;k++){
+      const idx = pg*PERPAGE+k; if(idx>=items.length) break;
+      const r=Math.floor(k/COLS), c=k%COLS;
+      const x=PAD+c*(CELL_W+GAP), y=top+r*(CELL_H+GAP);
+      cells += scheduleCellSVG(items[idx], idx, x, y, CELL_W, CELL_H);
+    }
+    if(!items.length) cells = `<text x="${PAGE_W/2}" y="${top+140}" font-size="20" text-anchor="middle" fill="#aaa">창호 항목이 없습니다.</text>`;
+    pages.push({ body: pageWrap(hd.markup+cells), W:PAGE_W, H:PAGE_H });
+  }
+  return pages;
+}
+function buildQuotePages(p){
+  const m = projDocMeta(p);
+  let sum=0;
+  const rows = m.items.map((it,idx)=>{
+    const qty=it.qty||1; const unit=it.unitTotal!=null?it.unitTotal:(it.grandTotal!=null?Math.round(it.grandTotal):0);
+    const line=it.cancelled?0:(it.grandTotal!=null?Math.round(it.grandTotal*qty):unit*qty);
+    if(!it.cancelled) sum+=line; return {it,idx,qty,unit,line};
+  });
+  const vat = Math.round(sum*0.1);
+  const RPP=26, rowH=46, thH=44;
+  const totalPages = Math.max(1, Math.ceil(rows.length/RPP));
+  const cols=[0,70,360,640,820,940,PAGE_W-2*PAD]; const cx=i=>PAD+cols[i];
+  const pages=[];
+  for(let pg=0; pg<totalPages; pg++){
+    const hd = docHeaderSVG(m, '견 적 서', 'DECCO SYSTEM WINDOW', pg===0, pg+1, totalPages);
+    let body = hd.markup;
+    const thY = hd.contentTop;
+    body += `<rect x="${PAD}" y="${thY}" width="${PAGE_W-2*PAD}" height="${thH}" fill="#e7ecf5"/>
+      <text x="${cx(0)+35}" y="${thY+28}" font-size="17" font-weight="800" text-anchor="middle" fill="#16233f">No</text>
+      <text x="${cx(1)+12}" y="${thY+28}" font-size="17" font-weight="800" fill="#16233f">제품</text>
+      <text x="${cx(2)+12}" y="${thY+28}" font-size="17" font-weight="800" fill="#16233f">부호/위치</text>
+      <text x="${cx(3)+12}" y="${thY+28}" font-size="17" font-weight="800" fill="#16233f">사이즈</text>
+      <text x="${cx(4)+30}" y="${thY+28}" font-size="17" font-weight="800" text-anchor="middle" fill="#16233f">수량</text>
+      <text x="${cx(6)-12}" y="${thY+28}" font-size="17" font-weight="800" text-anchor="end" fill="#16233f">금액</text>`;
+    const start=pg*RPP, end=Math.min(start+RPP, rows.length);
+    let yy = thY+thH;
+    for(let i=start;i<end;i++){
+      const r=rows[i]; const cy=yy+rowH/2+5;
+      const fill=r.it.cancelled?'#999':'#111'; const deco=r.it.cancelled?'text-decoration="line-through"':'';
+      const typeL=r.it.typeDisplay||TYPE_LABEL_FULL[r.it.baseType]||r.it.baseType||'';
+      const mk=[r.it.mark,r.it.location].filter(Boolean).join('/')||'-';
+      body += `<line x1="${PAD}" y1="${yy}" x2="${PAGE_W-PAD}" y2="${yy}" stroke="#ccd" stroke-width="1"/>
+        <text x="${cx(0)+35}" y="${cy}" font-size="18" text-anchor="middle" fill="${fill}">${esc(dispNum(r.it,r.idx))}</text>
+        <text x="${cx(1)+12}" y="${cy}" font-size="17" fill="${fill}" ${deco}>${esc(typeL)}</text>
+        <text x="${cx(2)+12}" y="${cy}" font-size="17" fill="${fill}" ${deco}>${esc(mk)}</text>
+        <text x="${cx(3)+12}" y="${cy}" font-size="17" fill="${fill}">${esc(r.it.W)}×${esc(r.it.H)}</text>
+        <text x="${cx(4)+30}" y="${cy}" font-size="17" text-anchor="middle" fill="${fill}">${r.qty}</text>
+        <text x="${cx(6)-12}" y="${cy}" font-size="17" text-anchor="end" fill="${fill}">${r.it.cancelled?'취소':r.line.toLocaleString('ko-KR')}</text>`;
+      yy += rowH;
+    }
+    body += `<line x1="${PAD}" y1="${yy}" x2="${PAGE_W-PAD}" y2="${yy}" stroke="#888" stroke-width="1.2"/>`;
+    if(pg===totalPages-1){
+      const ty=yy+8;
+      body += `<text x="${PAGE_W-PAD-210}" y="${ty+26}" font-size="17" text-anchor="end" fill="#333">공급가액</text><text x="${PAGE_W-PAD-12}" y="${ty+26}" font-size="17" text-anchor="end" fill="#333">${sum.toLocaleString('ko-KR')}</text>
+        <text x="${PAGE_W-PAD-210}" y="${ty+26+rowH}" font-size="17" text-anchor="end" fill="#333">부가세 (10%)</text><text x="${PAGE_W-PAD-12}" y="${ty+26+rowH}" font-size="17" text-anchor="end" fill="#333">${vat.toLocaleString('ko-KR')}</text>
+        <rect x="${PAD}" y="${ty+rowH*2-4}" width="${PAGE_W-2*PAD}" height="${rowH}" fill="#eef7f0"/>
+        <text x="${PAGE_W-PAD-210}" y="${ty+rowH*2+28}" font-size="20" font-weight="900" text-anchor="end" fill="#1a6e1a">합계 (VAT 포함)</text><text x="${PAGE_W-PAD-12}" y="${ty+rowH*2+28}" font-size="20" font-weight="900" text-anchor="end" fill="#1a6e1a">₩${(sum+vat).toLocaleString('ko-KR')}</text>`;
+    }
+    pages.push({ body: pageWrap(body), W:PAGE_W, H:PAGE_H });
+  }
+  return pages;
+}
+function buildDocPages(p, type){ return type==='quote' ? buildQuotePages(p) : buildSchedulePages(p); }
+// 단일 이미지(PNG) 공유용: 페이지를 세로로 이어붙임
+function buildShareSVG(p, type){
+  const pages = buildDocPages(p, type);
+  if(pages.length===1) return pageToSVG(pages[0]);
+  const W=pages[0].W, H=pages[0].H;
+  const inner = pages.map((pg,i)=>`<svg x="0" y="${i*H}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${pg.body}</svg>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H*pages.length}" viewBox="0 0 ${W} ${H*pages.length}" font-family="'Noto Sans KR',sans-serif">${inner}</svg>`;
+}
+
+// ── 공유 (mode: 'png' | 'pdf') ──
+async function shareDoc(mode){
+  const busy = $('doc-busy'); const btxt = $('doc-busy-txt');
+  busy.classList.add('on');
+  btxt.textContent = mode==='pdf' ? 'PDF 만드는 중…' : '이미지 만드는 중…';
+  const m = projDocMeta(_currentDetail);
+  const docName = _curDocType==='quote' ? '견적서' : '창호일람표';
+  const base = `${(m.name||'DECCO').replace(/[\\/:*?"<>|]/g,'_')}_${docName}`;
+  try{
+    let blob, fname, mime;
+    if(mode==='pdf'){
+      blob = await buildSharePdfBlob(_currentDetail, _curDocType);
+      fname = base + '.pdf'; mime = 'application/pdf';
+    }else{
+      const png = await svgStringToPng(buildShareSVG(_currentDetail, _curDocType), 2);
+      blob = await (await fetch(png)).blob();
+      fname = base + '.png'; mime = 'image/png';
+    }
+    const file = new File([blob], fname, { type:mime });
+    busy.classList.remove('on');
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title:base });
+    }else{
+      // 파일 공유 미지원 → 다운로드 후 안내
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      alert(`${mode==='pdf'?'PDF':'이미지'}를 저장했습니다.\n다운로드 폴더에서 카톡으로 공유하세요.\n(이 브라우저는 앱으로 바로 공유를 지원하지 않습니다.)`);
+    }
+  }catch(e){
+    busy.classList.remove('on');
+    console.error('[share]', mode, e);
+    if(e && /share|abort|cancel/i.test(e.name||'')) return; // 사용자가 공유 취소
+    alert((mode==='pdf'?'PDF':'이미지')+'를 만들지 못했습니다.\n' + (e&&e.message?e.message+'\n':'') + '다른 방식(이미지/PDF)으로 다시 시도해 보세요.');
+  }
+}
+
+// ════════════════════════════════════════════════
+// 화면 전환
+// ════════════════════════════════════════════════
+function showList(){
+  $('view-list').classList.remove('hidden');
+  $('view-detail').classList.add('hidden');
+  $('app-back').classList.add('hidden');
+  $('app-title').textContent='현장 목록';
+  $('app-sub').textContent='📱 모바일 버전';
+  _currentDetail=null;
+}
+function showDetail(){
+  $('view-list').classList.add('hidden');
+  $('view-detail').classList.remove('hidden');
+  $('app-back').classList.remove('hidden');
+}
+function showAppHome(){ showList(); }
+
+// ════════════════════════════════════════════════
+// 이벤트 바인딩
+// ════════════════════════════════════════════════
+$('li-btn').onclick = doLogin;
+$('li-pwd').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('li-email').addEventListener('keydown', e=>{ if(e.key==='Enter') $('li-pwd').focus(); });
+$('app-logout').onclick = doLogout;
+$('app-refresh').onclick = ()=>{ if(_currentDetail){ /* 상세에서 새로고침 → 목록 갱신 후 현 상세 다시 */ loadProjects().then(()=>{ const p=_projects.find(x=>String(x.id)===String(_currentDetail.id)); if(p) openDetail(p.id); else showList(); }); } else { loadProjects(); } };
+$('app-back').onclick = ()=>{ try{ history.back(); }catch(_){ showList(); } };
+$('search').addEventListener('input', e=>{ _searchText=e.target.value; applyFilters(); });
+
+$('zoom-close').onclick = ()=>{ try{ history.back(); }catch(_){ closeZoom(); } };
+$('zoom-in').onclick = ()=>{ _zoomScale=Math.min(4,_zoomScale+0.25); applyZoom(); };
+$('zoom-out').onclick = ()=>{ _zoomScale=Math.max(0.5,_zoomScale-0.25); applyZoom(); };
+$('zoom-reset').onclick = ()=>{ _zoomScale=1; applyZoom(); };
+
+// 출력 시트 / 문서 뷰어
+$('sheet-bg').onclick = (e)=>{ if(e.target===$('sheet-bg')){ try{ history.back(); }catch(_){ closeSheet(); } } };
+$('doc-close').onclick = ()=>{ try{ history.back(); }catch(_){ closeDoc(); } };
+// doc-pdf / doc-img / doc-print 의 동작은 setDocActions(mode)에서 모드별로 지정됨
+
+// 하드웨어 뒤로가기: 문서>줌>상세 순으로 닫기
+window.addEventListener('popstate', ()=>{
+  if($('docview').classList.contains('on')){ closeDoc(); return; }
+  if($('zoom').classList.contains('on')){ closeZoom(); return; }
+  if($('sheet-bg').classList.contains('on')){ closeSheet(); return; }
+  if(_currentDetail){ showList(); }
+});
+
+// 세션 자동 만료 시 로그인으로
+sb.auth.onAuthStateChange((event)=>{ if(event==='SIGNED_OUT'){ showLogin(); } });
+
+init();
+</script>
+</body>
+</html>
