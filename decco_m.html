@@ -34,14 +34,14 @@
   /* ── App top bar ── */
   .topbar{
     position:sticky;top:0;z-index:40;
-    background:linear-gradient(180deg,var(--navy) 0%,var(--navy2) 100%);
+    background:#0d0d0d;
     color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
     display:flex;align-items:center;gap:12px;
     box-shadow:0 2px 14px rgba(15,23,38,.28);
   }
   .topbar .brand{display:flex;flex-direction:column;line-height:1.05;flex:1;min-width:0}
   .topbar .brand b{font-size:16px;font-weight:900;letter-spacing:.5px}
-  .topbar .brand small{font-size:10px;letter-spacing:2.5px;color:#9db0d4;font-weight:500;margin-top:2px}
+  .topbar .brand small{font-size:10px;letter-spacing:2.5px;color:#ddd;font-weight:500;margin-top:2px}
   .topbar .badge-ro{
     font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#cfe0ff;
     border:1px solid rgba(157,176,212,.5);border-radius:999px;padding:3px 9px;white-space:nowrap;
@@ -354,7 +354,7 @@
     <button id="app-back" class="back-btn hidden">‹</button>
     <div class="brand">
       <b id="app-title">Decco</b>
-      <small id="app-sub">📱 모바일 버전</small>
+      <small id="app-sub">현장 목록</small>
     </div>
     <span id="app-rolabel" class="badge-ro">읽기전용</span>
     <a href="https://gealans9000-manager.vercel.app/m.html" target="_blank" rel="noopener" title="GEALAN 모바일 뷰어 열기" style="width:34px;height:34px;border-radius:50%;background:#2563eb;color:#fff;font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none">G</a>
@@ -782,7 +782,7 @@ function openDetail(pid){
   let commonNote=''; if(notesArr.length && notesArr[0] && notesArr.every(n=>n===notesArr[0])) commonNote=notesArr[0];
 
   $('app-title').textContent = name || '현장';
-  $('app-sub').textContent = folder || '📱 모바일 버전';
+  $('app-sub').textContent = folder || '현장 목록';
 
   const head = `
     <div class="detail-head anim">
@@ -1534,7 +1534,7 @@ function showList(){
   $('view-detail').classList.add('hidden');
   $('app-back').classList.add('hidden');
   $('app-title').textContent='Decco';
-  $('app-sub').textContent='📱 모바일 버전';
+  $('app-sub').textContent='현장 목록';
   _currentDetail=null;
 }
 function showDetail(){
