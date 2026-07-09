@@ -328,7 +328,7 @@
 <div id="screen-login" class="center-screen">
   <div class="login-card">
     <div class="login-logo">
-      <div class="mark">G</div>
+      <div class="mark">D</div>
       <b>DECCO 현장 뷰어</b>
       <small>DECCO SYSTEM</small>
     </div>
@@ -357,6 +357,7 @@
       <small id="app-sub">📱 모바일 버전</small>
     </div>
     <span id="app-rolabel" class="badge-ro">읽기전용</span>
+    <a href="https://gealans9000-manager.vercel.app/m.html" target="_blank" rel="noopener" class="icon-btn" title="GEALAN 모바일 뷰어 열기" style="text-decoration:none">🔷</a>
     <button id="app-refresh" class="icon-btn" title="새로고침">⟳</button>
     <button id="app-logout" class="icon-btn" title="로그아웃">⏻</button>
   </div>
@@ -1021,7 +1022,8 @@ const PC_OUTPUTS = [
   { kind:'label',     title:'라벨 출력 리스트',      icon:'🏷️' },
   { kind:'quotesvg',  title:'견적서 (도면)',         icon:'🖼️' },
   { kind:'cost',      title:'원가 검토',             icon:'🔍' },
-  { kind:'mat',       title:'현장 자재 합계',        icon:'📊' }
+  { kind:'mat',       title:'현장 자재 합계',        icon:'📊' },
+  { kind:'labor',     title:'임가공비',              icon:'🔧' }
 ];
 function openOutputSheet(){
   let html = `<div class="section-tag" style="margin:2px 2px 8px">업체에 보낼 출력물 (PC와 100% 동일)</div>`;
@@ -1131,6 +1133,7 @@ async function genPcOutput(kind){
     case 'label':    return cw.buildLabelListHTML();
     case 'cost':     return cw.buildCostReviewHTML();
     case 'mat':      return cw.buildMaterialSummaryHTML();
+    case 'labor':    return cw.getBatchLaborCostHTML();
   }
   return '';
 }
