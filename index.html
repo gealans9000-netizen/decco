@@ -8019,7 +8019,7 @@ function update(){
     const _co=(document.getElementById('companyName')?.value||'').trim();
     const _si=(document.getElementById('siteName')?.value||'').trim();
     const _tbSite=document.getElementById('tb-site');
-    if(_tbSite) _tbSite.textContent=[_co,_si].filter(Boolean).join(' · ')||'미지정';
+    if(_tbSite) _tbSite.textContent=[_co,_si].filter(Boolean).join(' / ');
     const _cOut=document.getElementById('colorOut'), _cIn=document.getElementById('colorIn');
     const _ot=_cOut?(_cOut.options[_cOut.selectedIndex]?.text||_cOut.value||'-'):'-';
     const _it=_cIn?(_cIn.options[_cIn.selectedIndex]?.text||_cIn.value||'-'):'-';
