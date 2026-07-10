@@ -9391,9 +9391,8 @@ function getBatchLaborCostHTML(){
     <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0d7a6f;padding-bottom:6px;margin-bottom:10px">
       <div style="font-size:20px;font-weight:900;color:#0d7a6f">🔧 데코 임가공 비용 정산</div>
       <div style="background:#1e3a8a;color:#fff;padding:5px 18px;border-radius:4px;font-size:15px;font-weight:900;letter-spacing:1.5px">GEALAN KOREA</div>
-      <div style="font-size:11px;color:#666">작성일 ${today} · 총 ${orderItems.length}종 / ${totalQty}개</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${_siteColorBar()}<div style="font-size:10px;color:#666">작성일 ${today} · 총 ${orderItems.length}종 / ${totalQty}개</div></div>
     </div>
-    ${_siteColorBar()}
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#e6f4f1">
         <th style="${thS};width:190px">도면</th>
@@ -11159,9 +11158,9 @@ function _siteColorBar(){
   const cOut=document.getElementById('colorOut'), cIn=document.getElementById('colorIn');
   const ot=cOut?(cOut.options[cOut.selectedIndex]?.text||cOut.value||'-'):'-';
   const it=cIn?(cIn.options[cIn.selectedIndex]?.text||cIn.value||'-'):'-';
-  return `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#eef3fb;border:2px solid #1e3a8a;border-radius:8px;padding:10px 18px;margin:6px 0 12px">
-    <span style="font-size:19px;font-weight:900;color:#1e3a8a;letter-spacing:.3px">📍 ${site}</span>
-    <span style="font-size:14px;font-weight:700;color:#333">🎨 외부 <b style="color:#0d5048">${ot}</b> &nbsp;·&nbsp; 내부 <b style="color:#0d5048">${it}</b></span>
+  return `<div style="text-align:right;background:#eef3fb;border:1.5px solid #1e3a8a;border-radius:7px;padding:6px 13px;line-height:1.35;white-space:nowrap">
+    ${site?`<div style="font-size:15px;font-weight:900;color:#1e3a8a">📍 ${site}</div>`:''}
+    <div style="font-size:11px;font-weight:700;color:#333;margin-top:1px">🎨 외부 <b style="color:#0d5048">${ot}</b> · 내부 <b style="color:#0d5048">${it}</b></div>
   </div>`;
 }
 function buildCostReviewHTML(){
@@ -11437,8 +11436,8 @@ function buildCostReviewHTML(){
         <div class="cr-title">🔍 원가 검토 — 창호별 상세 내역</div>
         <div class="cr-meta">Decco | ${site} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
+      ${_siteColorBar()}
     </div>
-    ${_siteColorBar()}
     <div class="cr-summary">
       <div>📊 전체 공급가 합계</div>
       <div class="cr-summary-val">${fmt(grandTotal)}</div>
@@ -11613,8 +11612,8 @@ function buildMaterialSummaryHTML(){
         <div class="ms-title">📊 현장 자재 합계</div>
         <div class="ms-meta">Decco | ${site}${company?` (${company})`:''} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
+      ${_siteColorBar()}
     </div>
-    ${_siteColorBar()}
     <div class="ms-summary-card">
       <div>
         <div class="ms-summary-label">📦 자재 합계 (공급가)</div>
