@@ -11145,7 +11145,7 @@ function restoreFromOrder(id){
 function _siteColorBar(){
   const co=(document.getElementById('companyName')?.value||'').trim();
   const si=(document.getElementById('siteName')?.value||'').trim();
-  const site=[si, co&&('('+co+')')].filter(Boolean).join(' ')||'현장 미지정';
+  const site=[co, si].filter(Boolean).join(' / ');
   const cOut=document.getElementById('colorOut'), cIn=document.getElementById('colorIn');
   const ot=cOut?(cOut.options[cOut.selectedIndex]?.text||cOut.value||'-'):'-';
   const it=cIn?(cIn.options[cIn.selectedIndex]?.text||cIn.value||'-'):'-';
