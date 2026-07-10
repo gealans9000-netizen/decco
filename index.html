@@ -1497,6 +1497,8 @@ W × H / 91809 = 평 (최소 3평), 평 × 단가/평
     <span class="ctb-label">셀<span class="ctb-val" id="tb-cells">2개</span></span>
     <span class="ctb-label">유리<span class="ctb-val" id="tb-ga">5.299 m²</span></span>
     <span class="ctb-label">프레임<span class="ctb-val" id="tb-frame">F72+S78</span></span>
+    <span class="ctb-label">현장<span class="ctb-val" id="tb-site" style="color:#1e5fd4;font-weight:800">-</span></span>
+    <span class="ctb-label">색상<span class="ctb-val" id="tb-color">-</span></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
       <button id="btn-hide-addon" class="btn btn-s btn-sm" onclick="toggleHideAddon()" title="T/S 덧바 표시 단순화 — 왼쪽 덧바 치수 숨김 + 덧바 색상을 외부 프레임과 동일하게 (창호 일람표·견적서 도면에만 적용)" style="font-size:10px">🔇 T/S 덧바 숨김</button>
       <button id="btn-cell-info" class="btn btn-s btn-sm" onclick="toggleCellInfo()" title="m²/평/kg 표시 토글" style="font-size:10px">📊 정보 표시</button>
@@ -8012,6 +8014,18 @@ function update(){
   const tGA=g.cells.reduce((s,c)=>s+c.glassW*c.glassH,0)/1e6;
   document.getElementById('tb-ga').textContent=tGA.toFixed(3)+' m²';
   document.getElementById('tb-frame').textContent=dn(document.getElementById('frameType').value)+'+'+dn(document.getElementById('sashType').value);
+  // 현장명(업체·현장) + 내/외부 색상 표시 — 불러온 현장 구분용
+  {
+    const _co=(document.getElementById('companyName')?.value||'').trim();
+    const _si=(document.getElementById('siteName')?.value||'').trim();
+    const _tbSite=document.getElementById('tb-site');
+    if(_tbSite) _tbSite.textContent=[_co,_si].filter(Boolean).join(' · ')||'미지정';
+    const _cOut=document.getElementById('colorOut'), _cIn=document.getElementById('colorIn');
+    const _ot=_cOut?(_cOut.options[_cOut.selectedIndex]?.text||_cOut.value||'-'):'-';
+    const _it=_cIn?(_cIn.options[_cIn.selectedIndex]?.text||_cIn.value||'-'):'-';
+    const _tbColor=document.getElementById('tb-color');
+    if(_tbColor) _tbColor.textContent='외 '+_ot+' / 내 '+_it;
+  }
   // 하드웨어 섹션 표시 토글: T/S, T/T, T/O, DOOR, PROJ 셀 중 하나라도 있을 때
   const hwSec = document.getElementById('hwSection');
   if(hwSec){
@@ -9374,6 +9388,7 @@ function getBatchLaborCostHTML(){
       <div style="background:#1e3a8a;color:#fff;padding:5px 18px;border-radius:4px;font-size:15px;font-weight:900;letter-spacing:1.5px">GEALAN KOREA</div>
       <div style="font-size:11px;color:#666">작성일 ${today} · 총 ${orderItems.length}종 / ${totalQty}개</div>
     </div>
+    ${_siteColorBar()}
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#e6f4f1">
         <th style="${thS};width:190px">도면</th>
@@ -11126,6 +11141,19 @@ function restoreFromOrder(id){
 // ────────────────────────────────────────────────
 // 견적서 출력 / CSV
 // ────────────────────────────────────────────────
+// 출력물용 현장명(크게) + 내/외부 색상 밴드
+function _siteColorBar(){
+  const co=(document.getElementById('companyName')?.value||'').trim();
+  const si=(document.getElementById('siteName')?.value||'').trim();
+  const site=[si, co&&('('+co+')')].filter(Boolean).join(' ')||'현장 미지정';
+  const cOut=document.getElementById('colorOut'), cIn=document.getElementById('colorIn');
+  const ot=cOut?(cOut.options[cOut.selectedIndex]?.text||cOut.value||'-'):'-';
+  const it=cIn?(cIn.options[cIn.selectedIndex]?.text||cIn.value||'-'):'-';
+  return `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:#eef3fb;border:2px solid #1e3a8a;border-radius:8px;padding:10px 18px;margin:6px 0 12px">
+    <span style="font-size:19px;font-weight:900;color:#1e3a8a;letter-spacing:.3px">📍 ${site}</span>
+    <span style="font-size:14px;font-weight:700;color:#333">🎨 외부 <b style="color:#0d5048">${ot}</b> &nbsp;·&nbsp; 내부 <b style="color:#0d5048">${it}</b></span>
+  </div>`;
+}
 function buildCostReviewHTML(){
   if(!orderItems.length) return '';
   // 출력 전 강제 동기화: 전체 'none' 여부 따라 adjExclude 갱신
@@ -11400,6 +11428,7 @@ function buildCostReviewHTML(){
         <div class="cr-meta">Decco | ${site} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
     </div>
+    ${_siteColorBar()}
     <div class="cr-summary">
       <div>📊 전체 공급가 합계</div>
       <div class="cr-summary-val">${fmt(grandTotal)}</div>
@@ -11575,6 +11604,7 @@ function buildMaterialSummaryHTML(){
         <div class="ms-meta">Decco | ${site}${company?` (${company})`:''} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
     </div>
+    ${_siteColorBar()}
     <div class="ms-summary-card">
       <div>
         <div class="ms-summary-label">📦 자재 합계 (공급가)</div>
