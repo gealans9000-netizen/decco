@@ -8016,8 +8016,13 @@ function update(){
   document.getElementById('tb-frame').textContent=dn(document.getElementById('frameType').value)+'+'+dn(document.getElementById('sashType').value);
   // 현장명(업체·현장) + 내/외부 색상 표시 — 불러온 현장 구분용
   {
-    const _co=(document.getElementById('companyName')?.value||'').trim();
-    const _si=(document.getElementById('siteName')?.value||'').trim();
+    let _co=(document.getElementById('companyName')?.value||'').trim();
+    let _si=(document.getElementById('siteName')?.value||'').trim();
+    if(!_co && !_si && typeof orderItems!=='undefined' && orderItems.length){
+      const _it0=orderItems.find(i=>i&&(i.company||i.site))||orderItems[0];
+      _co=_it0.company||(_it0.snapshot&&_it0.snapshot.companyName)||'';
+      _si=_it0.site||(_it0.snapshot&&_it0.snapshot.siteName)||'';
+    }
     const _tbSite=document.getElementById('tb-site');
     if(_tbSite) _tbSite.textContent=[_co,_si].filter(Boolean).join(' / ');
     const _cOut=document.getElementById('colorOut'), _cIn=document.getElementById('colorIn');
@@ -11143,8 +11148,13 @@ function restoreFromOrder(id){
 // ────────────────────────────────────────────────
 // 출력물용 현장명(크게) + 내/외부 색상 밴드
 function _siteColorBar(){
-  const co=(document.getElementById('companyName')?.value||'').trim();
-  const si=(document.getElementById('siteName')?.value||'').trim();
+  let co=(document.getElementById('companyName')?.value||'').trim();
+  let si=(document.getElementById('siteName')?.value||'').trim();
+  if(!co && !si && typeof orderItems!=='undefined' && orderItems.length){
+    const it0=orderItems.find(i=>i&&(i.company||i.site))||orderItems[0];
+    co=it0.company||(it0.snapshot&&it0.snapshot.companyName)||'';
+    si=it0.site||(it0.snapshot&&it0.snapshot.siteName)||'';
+  }
   const site=[co, si].filter(Boolean).join(' / ');
   const cOut=document.getElementById('colorOut'), cIn=document.getElementById('colorIn');
   const ot=cOut?(cOut.options[cOut.selectedIndex]?.text||cOut.value||'-'):'-';
