@@ -840,6 +840,13 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
           </select>
         </div>
       </div>
+      <!-- TUO: 틸트 없이 여닫이만 (T/T·T/T+FIX 전용) — 도면에서 역V(틸트) 표시 제거 -->
+      <div class="fg" id="hwTuoWrap" style="margin:0 0 8px 0;opacity:0.45" title="현재 창호에 T/T 셀 없음 (미리 설정 가능)">
+        <label style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;color:var(--text);cursor:pointer;padding:4px 6px;background:var(--bg4);border-radius:5px">
+          <input type="checkbox" id="optTuo" onchange="setTuo(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:#7a5cd6">
+          <span>TUO (틸트 없음 — 여닫이만)</span>
+        </label>
+      </div>
       <!-- DOOR 하드웨어 타입 (DOOR 셀이 있을 때만 활성, 없으면 흐리게) -->
       <div class="fg" id="hwDoorWrap" style="margin: 0px 0px 8px 0px; opacity: 0.45;" title="현재 창호에 DOOR 셀 없음 (미리 설정 가능)">
         <label class="lbl" style="font-size:10px">🚪 DOOR 타입</label>
@@ -1866,6 +1873,24 @@ function setHwTTType(t){
   }
   update();
 }
+// TUO(틸트 없음 — 여닫이만) 여부: 항목 스냅샷/wo에 저장된 optTuo
+function isTuoItem(item){
+  if(!item) return false;
+  const bt = item.baseType;
+  if(bt !== 'TT' && bt !== 'TTFIX' && bt !== 'TTTT') return false;
+  return !!(item.snapshot?.optTuo ?? item.wo?.optTuo);
+}
+// TUO 선택 시 제품 표기를 TURN ONLY(여닫이) 로 치환
+function applyTuoLabel(label, item){
+  if(!isTuoItem(item)) return label;
+  return String(label||'').replace(/TILT&TURN\(윗열기\+여닫이\)/g, 'TURN ONLY(여닫이)');
+}
+// TUO: 틸트 없이 여닫이만 (T/T·T/T+FIX 전용) — 도면에서 역V(틸트) 표시 제거
+function setTuo(on){
+  const chk = document.getElementById('optTuo');
+  if(chk && chk.checked !== !!on) chk.checked = !!on;
+  update();
+}
 // 매립힌지 체크박스 → 하드웨어 콤보로 역방향 동기화
 // 사용자가 헤더의 매립힌지 체크박스를 토글했을 때 콤보도 따라가도록 헬퍼 제공
 function syncHwTTTypeFromCheckbox(){
@@ -1953,6 +1978,49 @@ function toggleHideAddon(){
   if(window._hideAddonForExport){
     showToast?.('🔇 T/S 덧바 숨김 활성화 — 창호 일람표·견적서(도면) 출력 시 적용됩니다');
   }
+}
+
+// ── 업로드 도면(이형) 라벨 — 클릭해서 '이형' ↔ '지붕창' 등으로 수정 가능 ──
+function irrLabel(wo){ return (wo && wo.customImgLabel) ? wo.customImgLabel : '이형'; }
+function editIrrLabel(id, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const item = (typeof orderItems!=='undefined') ? orderItems.find(i=>i.id===id) : null;
+  if(!item || !item.wo || !item.wo.customImgData) return;
+  const cur = irrLabel(item.wo);
+  document.getElementById('irr-label-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'irr-label-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
+  const presets = ['이형','지붕창','곡면창','특수창'];
+  ov.innerHTML =
+    '<div style="background:#fff;border-radius:12px;padding:20px 22px;width:330px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    + '<div style="font-size:14px;font-weight:800;color:#a04000;margin-bottom:3px">🏷 도면 라벨 수정</div>'
+    + '<div style="font-size:11px;color:#888;margin-bottom:12px">아래 버튼을 누르거나 직접 입력하세요</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">'
+    + presets.map(t=>'<button type="button" onclick="var e=document.getElementById(\'irr-label-input\');e.value=\''+t+'\';e.focus();" style="font-size:11px;padding:4px 11px;border:1px solid #e0a070;background:#fff4e6;color:#a04000;border-radius:6px;cursor:pointer;font-weight:700">'+t+'</button>').join('')
+    + '</div>'
+    + '<input id="irr-label-input" type="text" value="'+String(cur).replace(/"/g,'&quot;')+'" '
+    + 'style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:13px;border:2px solid #e07020;border-radius:7px;outline:none;margin-bottom:14px" '
+    + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();_saveIrrLabel('+id+');}else if(event.key===\'Escape\'){document.getElementById(\'irr-label-modal\').remove();}">'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+    + '<button type="button" onclick="document.getElementById(\'irr-label-modal\').remove()" style="padding:7px 14px;font-size:12px;border:1px solid #ccc;background:#f4f4f4;color:#555;border-radius:7px;cursor:pointer;font-weight:700">취소</button>'
+    + '<button type="button" onclick="_saveIrrLabel('+id+')" style="padding:7px 18px;font-size:12px;border:none;background:#e07020;color:#fff;border-radius:7px;cursor:pointer;font-weight:800">저장</button>'
+    + '</div></div>';
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const inp = document.getElementById('irr-label-input');
+  if(inp){ inp.focus(); inp.select(); }
+}
+function _saveIrrLabel(id){
+  const item = (typeof orderItems!=='undefined') ? orderItems.find(i=>i.id===id) : null;
+  const inp = document.getElementById('irr-label-input');
+  document.getElementById('irr-label-modal')?.remove();
+  if(!item || !item.wo || !inp) return;
+  item.wo.customImgLabel = (inp.value||'').trim() || '이형';
+  try{ renderItemList(); }catch(e){}
+  try{ if(typeof refreshTable==='function') refreshTable(); }catch(e){}
+  try{ if(typeof markDirty==='function') markDirty(); }catch(e){}
+  try{ showToast?.('🏷 라벨 변경: '+item.wo.customImgLabel); }catch(e){}
 }
 
 function toggleOrderItemInfo(id){
@@ -3015,6 +3083,7 @@ async function regenerateSingleItemCore(id){
   if(!item) return;
   // ★ 이형 관련 데이터 백업 (재생성 후 복원)
   const preservedCustomImgData = item.wo && item.wo.customImgData ? item.wo.customImgData : null;
+  const preservedCustomImgLabel = item.wo && item.wo.customImgLabel ? item.wo.customImgLabel : null;
   // 1. 설계 패널에 복원 (snapshot의 모든 값을 메인 화면 DOM에 반영)
   await restoreFromOrder(id);
   // 2. 한 프레임 정도 추가 대기
@@ -3029,6 +3098,7 @@ async function regenerateSingleItemCore(id){
   const nV = parseInt(document.getElementById('vMul').value)||0;
   const nH = parseInt(document.getElementById('hMul').value)||0;
   const g = (typeof computeGeom==='function') ? computeGeom(W,H,nV,nH) : null;
+  if(g) g.optTuo = !!document.getElementById('optTuo')?.checked;
   const ci = (typeof computeCost==='function') ? computeCost(W,H,g) : null;
   // window._cost가 computeCost 결과 — commitEditOrder와 동일한 방식으로 가격 필드 갱신
   const p = window._cost;
@@ -3048,6 +3118,8 @@ async function regenerateSingleItemCore(id){
       // 안전망: restoreFromOrder 후에도 canvasCustomImgData가 비어있다면 백업본 사용
       newWo.customImgData = preservedCustomImgData;
     }
+    // ★ 업로드 도면 라벨(이형/지붕창 등) 보존
+    if(preservedCustomImgLabel) newWo.customImgLabel = preservedCustomImgLabel;
     item.wo = newWo;
   }
   // 5. ★ 가격 필드 일괄 갱신 — commitEditOrder와 동일한 키들
@@ -3464,7 +3536,7 @@ function buildRow(item, idx){
 
   return '<tr '+rowStyle+'>' +
     '<td class="sticky-col sticky-col-1" style="text-align:center'+(item.cancelled?';background:#ffe0e0':'')+'"><span class="num-pill"'+(item.cancelled?' style="background:#888;border-color:#555"':'')+'>'+displayNum+'</span>'+(item.cancelled?'<br><span style="font-size:9px;color:#cc0000;font-weight:900;letter-spacing:-0.5px">❌ 취소</span>':'')+'</td>' +
-    '<td class="sticky-col sticky-col-2" style="text-align:center"><span class="type-label">'+(TYPE_LABEL_SHORT[item.baseType]||item.baseType)+'</span>'+(item.wo&&item.wo.customImgData?'<br><span style="display:inline-block;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:0 5px;border-radius:7px;border:1px solid #a04000;margin-top:2px" title="이형">⚠ 이형</span>':'')+'</td>' +
+    '<td class="sticky-col sticky-col-2" style="text-align:center"><span class="type-label">'+(TYPE_LABEL_SHORT[item.baseType]||item.baseType)+'</span>'+(item.wo&&item.wo.customImgData?'<br><span style="display:inline-block;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:0 5px;border-radius:7px;border:1px solid #a04000;margin-top:2px" title="이형">⚠ ${irrLabel(item.wo)}</span>':'')+'</td>' +
     '<td class="sticky-col sticky-col-3" style="text-align:center"><span class="dim">'+item.W+'×'+item.H+'</span></td>' +
     '<td class="sticky-col sticky-col-4"><input type="number" min="1" value="'+(item.qty||1)+'" onchange="update('+item.id+',\\'qty\\',this.value);refreshTable()" style="text-align:center;font-weight:700"></td>' +
     '<td><input value="'+esc(item.company)+'" onblur="update('+item.id+',\\'company\\',this.value)"></td>' +
@@ -3653,7 +3725,7 @@ function renderItemList(){
           style="width:44px;height:22px;min-width:44px;background:#e00;color:#fff;border:2px solid #900;border-radius:11px;text-align:center;font-size:12px;font-weight:900;padding:0 4px;outline:none;cursor:text;font-family:Arial,sans-serif;flex-shrink:0;box-sizing:border-box"
         />
         <span class="oi-badge ${(()=>{const BC={TS:'b-ts',TT:'b-tt',TO:'b-to',FIX:'b-fix',DOOR:'b-door',PROJ:'b-proj',TTFIX:'b-ttfix',TTTT:'b-tttt',TSTS:'b-tsts'};return BC[item.baseType]||'b-ts'})()}">${item.typeDisplay||item.baseType}</span>
-        ${item.wo?.customImgData?`<span style="background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;border:1.5px solid #a04000;box-shadow:0 1px 2px rgba(224,112,32,.3)" title="이형 창호 — 업로드된 도면 사용">⚠ 이형</span>`:''}
+        ${item.wo?.customImgData?`<span onclick="editIrrLabel(${item.id}, event)" title="클릭하여 라벨 수정" style="cursor:pointer;background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;border:1.5px solid #a04000;box-shadow:0 1px 2px rgba(224,112,32,.3)" title="이형 창호 — 업로드된 도면 사용">⚠ ${irrLabel(item.wo)}</span>`:''}
         <span style="font-size:12px;font-weight:600;color:var(--text)">${item.W}×${item.H}</span>
         ${item.qty>1?`<span style="font-size:14px;font-weight:900;color:#e00;background:#fff200;border:2px solid #d4a500;border-radius:5px;padding:1px 8px;font-family:Arial,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.15)" title="수량 ${item.qty}">×${item.qty}</span>`:''}
         <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--accent2);font-family:'DM Mono',monospace">${fmt(item.grandTotal)}</span>
@@ -4690,8 +4762,9 @@ function drawWindow(W,H,g){
       h += `<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy}"    stroke="${col}" stroke-width="${sw}" stroke-linecap="round" opacity="1"/>`;
       h += `<line x1="${handleX}" y1="${ph}" x2="${hingeX}" y2="${sy+sH}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" opacity="1"/>`;
       h += `<circle cx="${handleX}" cy="${ph}" r="5" fill="${dotCol}" opacity="1"/>`;
-      // ② 상단 중앙 기점 역V (실선) — 환기 가능 표시
-      h += invV('solid');
+      // ② 상단 중앙 기점 역V (실선) — 환기(틸트) 가능 표시
+      //    ※ TUO(틸트 없음) 선택 시에는 역V를 그리지 않음 (여닫이만)
+      if(!g.optTuo) h += invV('solid');
     }
     else if(ct === 'TO'){
       // 상단 중앙 기점 역V (실선) — 환기 전용
@@ -8001,6 +8074,7 @@ function update(){
   rebuildCellTypes(nV,nH,null);
   // 타입 표시: 셀별 타입이 다양하면 TT(1)FIX(2) 형식으로, FIX는 항상 마지막
   const g=computeGeom(W,H,nV,nH);
+  g.optTuo = !!document.getElementById('optTuo')?.checked;  // TUO: 역V 제거
   const _ctCount={};
   g.cells.filter(cell=>!cell.hidden).forEach(cell=>{ const t=cell.ct; _ctCount[t]=(_ctCount[t]||0)+1; });
   const _ctKeys=Object.keys(_ctCount);
@@ -8046,6 +8120,11 @@ function update(){
     if(tsWrap){
       tsWrap.style.opacity = hasTS ? '1' : '0.45';
       tsWrap.title = hasTS ? '' : '현재 창호에 T/S 셀 없음 (미리 설정 가능)';
+    }
+    const tuoWrap = document.getElementById('hwTuoWrap');
+    if(tuoWrap){
+      tuoWrap.style.opacity = hasTT ? '1' : '0.45';
+      tuoWrap.title = hasTT ? 'TUO: 틸트 없이 여닫이만 (도면에서 역V 제거)' : '현재 창호에 T/T 셀 없음 (미리 설정 가능)';
     }
     if(ttWrap){
       ttWrap.style.opacity = hasTT ? '1' : '0.45';
@@ -8226,6 +8305,7 @@ function getFullSettings(){
     // 도어/하드웨어 옵션
     optScreen:       document.getElementById('optScreen')?.checked || false,
     optHiddenHinge:  document.getElementById('optHiddenHinge')?.checked || false,
+    optTuo:          document.getElementById('optTuo')?.checked || false,
     optInsideOpen:   document.getElementById('optInsideOpen')?.checked || false,
     optOutsideOpen:  document.getElementById('optOutsideOpen')?.checked || false,
     optDigitalLock:  document.getElementById('optDigitalLock')?.checked || false,
@@ -8300,6 +8380,7 @@ function applyFullSettings(s){
   setVal('tapingSel',     s.tapingSel);
   setChk('optScreen',     s.optScreen);
   setChk('optHiddenHinge',s.optHiddenHinge);
+  setChk('optTuo',        s.optTuo);
   setChk('optInsideOpen', s.optInsideOpen);
   setChk('optOutsideOpen',s.optOutsideOpen);
   setChk('optDigitalLock',s.optDigitalLock);
@@ -8645,6 +8726,7 @@ function addToOrder(){
   const nH=parseInt(document.getElementById('hMul').value)||0;
   const blk=isBlack();
   const g=computeGeom(W,H,nV,nH);
+  g.optTuo = !!document.getElementById('optTuo')?.checked;  // TUO: 역V 제거
   const ci=computeCost(W,H,g);   // ← 먼저 계산해서 window._cost 최신화
   const p=window._cost;if(!p){return}
   const woData = collectWorkOrderData(W, H, qty, g, ci);
@@ -8693,6 +8775,7 @@ function addToOrder(){
     optF240:     document.getElementById('optF240')?.checked||false,
     // 하드웨어 옵션 (매립힌지, DOOR 옵션 등) — 누락되면 다시 편집할 때 풀려버림
     optHiddenHinge:  document.getElementById('optHiddenHinge')?.checked||false,
+    optTuo:          document.getElementById('optTuo')?.checked||false,
     optInsideOpen:   document.getElementById('optInsideOpen')?.checked||false,
     optOutsideOpen:  document.getElementById('optOutsideOpen')?.checked||false,
     optDigitalLock:  document.getElementById('optDigitalLock')?.checked||false,
@@ -10167,6 +10250,8 @@ function batchExcel(){
   const chkFrameInner = document.getElementById('chk-frameinner-only')?.checked;
   const chkGB    = document.getElementById('chk-gb-only')?.checked;
   const chkLabel = document.getElementById('chk-label-only')?.checked;
+  const chkQuote    = document.getElementById('chk-quote')?.checked;
+  const chkQuoteSvg = document.getElementById('chk-quotesvg')?.checked;
   if(!chkSched && !chkWork && !chkCut && !chkGlass && !chkScreen && !chkFrameInner && !chkGB && !chkLabel){alert('저장할 항목을 1개 이상 선택하세요.');return}
 
   const data = buildCutData();
@@ -10668,6 +10753,135 @@ function batchExcel(){
     sheets = '';
   }
 
+  // ── 견적서 세부내역 → 엑셀 (A: 외부백색+내부백색, B: 외부블랙+내부백색 각각 별도 파일) ──
+  function exportQuoteDetailExcel(){
+    let quoteHtml = '';
+    try{ quoteHtml = getBatchQuoteHTML(false); }catch(e){ quoteHtml = ''; }
+    if(!quoteHtml){ alert('견적서를 생성하지 못했습니다.'); return 0; }
+    const host = document.createElement('div');
+    host.innerHTML = quoteHtml;
+    const _bd = c => ({top:{style:'thin',color:{rgb:c}},bottom:{style:'thin',color:{rgb:c}},left:{style:'thin',color:{rgb:c}},right:{style:'thin',color:{rgb:c}}});
+    const NUMFMT = '#,##0';                 // 천단위 콤마
+    const NO_COMMA_COLS = new Set([2,3,4]); // 가로 · 세로 · 수량 → 콤마 없음
+    const COL = 8;
+    const pages = [
+      {sel:'.detail-A', tag:'A', label:'외부백색_내부백색', title:'외부 백색 + 내부 백색'},
+      {sel:'.detail-B', tag:'B', label:'외부블랙_내부백색', title:'외부 블랙 + 내부 백색'}
+    ];
+    let made = 0;
+    for(const pg of pages){
+      const pageEl = host.querySelector(pg.sel);
+      if(!pageEl) continue;
+      const table = pageEl.querySelector('table');
+      if(!table) continue;
+      const aoa = [], rowMeta = [], merges = [], numCells = [];
+      let rTotal = null, rRound = null, rFinal = null;   // 총금액 / 단수정리 / 최종금액 행 인덱스
+      const headerLoc = (company && site) ? `${company} (${site})` : (company || site || '');
+      aoa.push([`견적 세부 내역  [${pg.tag}. ${pg.title}]`]); rowMeta.push('title');
+      aoa.push([(headerLoc ? headerLoc + '  |  ' : '') + today]); rowMeta.push('subtitle');
+      table.querySelectorAll('tr').forEach(tr => {
+        const cells = tr.querySelectorAll('th,td');
+        if(!cells.length) return;
+        const rIdx = aoa.length;   // 이 행이 들어갈 AOA 인덱스
+        const row = [];
+        let c = 0, firstText = '';
+        cells.forEach((td, ci) => {
+          const cs = parseInt(td.getAttribute('colspan')) || 1;
+          const inp = td.querySelector('input');
+          let raw = inp ? (inp.value ?? inp.getAttribute('value') ?? '') : td.textContent;
+          raw = String(raw || '').replace(/\s+/g,' ').trim();
+          if(ci === 0) firstText = raw;
+          let val = raw, isNum = false;
+          if(/\d/.test(raw) && /^-?[\d,]+(\.\d+)?$/.test(raw)){
+            const n = Number(raw.replace(/,/g,''));
+            if(!isNaN(n)){ val = n; isNum = true; }
+          }
+          row[c] = val;
+          for(let i=1;i<cs;i++) row[c+i] = '';
+          if(cs > 1) merges.push({s:{r:rIdx,c:c}, e:{r:rIdx,c:c+cs-1}});   // colspan → 병합
+          if(isNum && !NO_COMMA_COLS.has(c)) numCells.push({r:rIdx, c:c}); // 콤마 서식 대상
+          c += cs;
+        });
+        for(let i=row.length;i<COL;i++) if(row[i]===undefined) row[i]='';
+        aoa.push(row);
+        const t0 = firstText;
+        if(tr.querySelector('th') && /순번/.test(tr.textContent)) rowMeta.push('header');
+        else if(t0 === '합계' || t0 === '총 금액' || /^공급가 합계/.test(t0) || /최종 금액/.test(t0)) rowMeta.push('total');
+        else rowMeta.push('data');
+        if(t0 === '총 금액') rTotal = rIdx;
+        else if(/최종 금액/.test(t0)) rFinal = rIdx;   // '최종 금액 (단수정리 후)' 먼저 판별
+        else if(/단수정리/.test(t0)) rRound = rIdx;    // '✂ 단수정리 (빼기)'
+      });
+      try{
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{wch:6},{wch:34},{wch:9},{wch:9},{wch:6},{wch:15},{wch:17},{wch:14}];
+        ws['!merges'] = [
+          {s:{r:0,c:0}, e:{r:0,c:COL-1}},
+          {s:{r:1,c:0}, e:{r:1,c:COL-1}},
+          ...merges
+        ];
+        // 천단위 콤마 서식 (가로/세로/수량 제외)
+        const commaSet = new Set(numCells.map(o => o.r + ',' + o.c));
+        numCells.forEach(({r,c}) => {
+          const ref = XLSX.utils.encode_cell({r,c});
+          if(ws[ref]) ws[ref].z = NUMFMT;
+        });
+        // 최종 금액 (단수정리 후) = 총 합계 − 단수정리(빼기)  ← 엑셀 수식
+        if(rTotal!=null && rRound!=null && rFinal!=null){
+          const totRef = XLSX.utils.encode_cell({r:rTotal, c:COL-1});  // 총금액 행 총합계
+          const rndRef = XLSX.utils.encode_cell({r:rRound, c:COL-1});  // 단수정리 값
+          const finRef = XLSX.utils.encode_cell({r:rFinal, c:COL-1});  // 최종금액
+          if(!ws[finRef]) ws[finRef] = {t:'n'};
+          ws[finRef].t = 'n';
+          ws[finRef].f = `${totRef}-${rndRef}`;
+          ws[finRef].z = NUMFMT;
+          if(ws[totRef]) ws[totRef].z = NUMFMT;
+          if(ws[rndRef]) ws[rndRef].z = NUMFMT;
+          commaSet.add(rTotal+','+(COL-1));
+          commaSet.add(rRound+','+(COL-1));
+          commaSet.add(rFinal+','+(COL-1));
+        }
+        const ST = {
+          title:    {font:{name:'맑은 고딕',sz:14,bold:true,color:{rgb:'1A4488'}},alignment:{horizontal:'center',vertical:'center'}},
+          subtitle: {font:{name:'맑은 고딕',sz:11,color:{rgb:'555555'}},alignment:{horizontal:'center',vertical:'center'}},
+          header:   {font:{name:'맑은 고딕',sz:11,bold:true,color:{rgb:'333333'}},alignment:{horizontal:'center',vertical:'center'},fill:{fgColor:{rgb:'F0F0F0'}},border:_bd('999999')},
+          total:    {font:{name:'맑은 고딕',sz:11,bold:true,color:{rgb:'1A4488'}},alignment:{horizontal:'center',vertical:'center'},fill:{fgColor:{rgb:'FFF8E1'}},border:_bd('999999')},
+          data:     {font:{name:'맑은 고딕',sz:10,color:{rgb:'222222'}},alignment:{horizontal:'center',vertical:'center'},border:_bd('CCCCCC')}
+        };
+        ws['!rows'] = rowMeta.map(t => t==='title' ? {hpt:26} : (t==='subtitle'||t==='header'||t==='total') ? {hpt:20} : {hpt:18});
+        rowMeta.forEach((type, r) => {
+          for(let c=0;c<COL;c++){
+            const ref = XLSX.utils.encode_cell({r, c});
+            if(!ws[ref]) ws[ref] = {t:'s', v:''};
+            const base = ST[type] || ST.data;
+            const isComma = commaSet.has(r + ',' + c);
+            let s = (ws[ref].t === 'n' || ws[ref].f)
+              ? Object.assign({}, base, {alignment:{horizontal:'right',vertical:'center'}})
+              : Object.assign({}, base);
+            if(isComma) s = Object.assign({}, s, {numFmt: NUMFMT});
+            ws[ref].s = s;
+          }
+        });
+        XLSX.utils.book_append_sheet(wb, ws, '견적세부('+pg.tag+')');
+        const locPart = (company && site) ? `_${company}(${site})` : (company ? `_${company}` : (site ? `_${site}` : ''));
+        const fn = safeFilename(`견적세부내역_${pg.tag}_${pg.label}${locPart}_${dateStr}`) + '.xlsx';
+        XLSX.writeFile(wb, fn);
+        made++;
+      }catch(err){
+        console.error('[견적세부 엑셀] 실패:', err);
+        alert('견적 세부내역 엑셀 저장 실패: ' + err.message);
+      }
+    }
+    if(!made) alert('견적 세부내역을 찾지 못했습니다. 견적서를 먼저 확인해 주세요.');
+    return made;
+  }
+
+  // ── 견적서 / 견적서(도면): 세부내역을 A(백색/백색)·B(블랙/백색) 별도 시트로 저장 ──
+  if(chkQuote || chkQuoteSvg){
+    savedCount += exportQuoteDetailExcel();
+  }
+
   // 작업지시서가 체크되어 있고 아직 시트가 남아있으면 다운로드 (작업지시서는 별도 시트 없음 — 안전장치)
   // 그 외 통합 단일 파일 다운로드 코드는 제거되어 파일이 항목별로 따로 저장됨
   showToast(`📊 엑셀 ${savedCount}개 파일 저장 완료`);
@@ -10720,6 +10934,7 @@ async function refreshAllSnapshots(){
     const nV = parseInt(document.getElementById('vMul')?.value)||0;
     const nH = parseInt(document.getElementById('hMul')?.value)||0;
     const g = computeGeom(item.W, item.H, nV, nH);
+    g.optTuo = !!(item.snapshot?.optTuo ?? document.getElementById('optTuo')?.checked);
     drawWindow(item.W, item.H, g);
 
     // 스냅샷 다시 캡처
@@ -10741,6 +10956,7 @@ async function refreshAllSnapshots(){
   const nV2 = parseInt(document.getElementById('vMul')?.value)||0;
   const nH2 = parseInt(document.getElementById('hMul')?.value)||0;
   const g2 = computeGeom(savedSettings.W||3000, savedSettings.H||2100, nV2, nH2);
+  g2.optTuo = !!(savedSettings.optTuo ?? document.getElementById('optTuo')?.checked);
   drawWindow(savedSettings.W||3000, savedSettings.H||2100, g2);
 
   showToast('✅ 도면 스냅샷 갱신 완료');
@@ -10776,6 +10992,7 @@ function commitEditOrder(){
   const nH=parseInt(document.getElementById('hMul').value)||0;
   const blk=isBlack();
   const g=computeGeom(W,H,nV,nH);
+  g.optTuo = !!document.getElementById('optTuo')?.checked;  // TUO: 역V 제거
   const ci=computeCost(W,H,g);   // ← 먼저 계산해서 window._cost 최신화
   const p=window._cost; if(!p){return;}
   const woData=collectWorkOrderData(W,H,qty,g,ci);
@@ -10823,6 +11040,7 @@ function commitEditOrder(){
     optF240:     document.getElementById('optF240')?.checked||false,
     // 하드웨어 옵션 (매립힌지, DOOR 옵션 등) — 누락되면 다시 편집할 때 풀려버림
     optHiddenHinge:  document.getElementById('optHiddenHinge')?.checked||false,
+    optTuo:          document.getElementById('optTuo')?.checked||false,
     optInsideOpen:   document.getElementById('optInsideOpen')?.checked||false,
     optOutsideOpen:  document.getElementById('optOutsideOpen')?.checked||false,
     optDigitalLock:  document.getElementById('optDigitalLock')?.checked||false,
@@ -11015,7 +11233,7 @@ function renderOrder(){
         />
       </div>
       <span class="oi-badge ${BC[item.baseType]||'b-ts'}">${item.typeDisplay||item.baseType}</span>
-      ${item.wo?.customImgData?`<span style="background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:9px;border:1.5px solid #a04000" title="이형 창호">⚠ 이형</span>`:''}
+      ${item.wo?.customImgData?`<span style="background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:9px;border:1.5px solid #a04000" title="이형 창호">⚠ ${irrLabel(item.wo)}</span>`:''}
       <div class="oi-info">
         <div class="oi-name">${item.W}×${item.H}${item.mark?' ['+item.mark+']':''}${item.location?' <span style="font-size:10px;color:var(--accent3)">'+item.location+'</span>':''}${item.buildType?' <span style="font-size:10px;color:var(--purple);background:rgba(155,114,245,.15);border-radius:3px;padding:1px 5px">'+item.buildType+'</span>':''}${item.hasHiddenHinge?' <span style="font-size:10px;color:var(--purple);background:rgba(155,114,245,.2);border:1px solid rgba(155,114,245,.4);border-radius:3px;padding:1px 6px;font-weight:700">🔩매립힌지</span>':''}${item.hasInsideOpen?' <span style="font-size:10px;color:#00aa00;background:rgba(0,170,0,.15);border:1px solid rgba(0,170,0,.4);border-radius:3px;padding:1px 6px;font-weight:700">🚪안쪽열기</span>':''}${item.itemNote?` <span style="font-size:10px;color:#d92e2e;background:#fff200;border:1px solid #d4a500;border-radius:3px;padding:1px 6px;font-weight:800" title="${item.itemNote.replace(/"/g,'&quot;')}">⚠ ${item.itemNote.replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0,30)}${item.itemNote.length>30?'…':''}</span>`:''}</div>
         <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
@@ -11302,7 +11520,7 @@ function buildCostReviewHTML(){
   const itemBlocks = orderItems.map((item, idx)=>{
     if(item.cancelled) return '';  // 취소 항목 스킵
     const num = getDisplayNum(item, idx);
-    const typeLabel = TYPE_LABEL[item.baseType]||item.baseType;
+    const typeLabel = applyTuoLabel(TYPE_LABEL[item.baseType]||item.baseType, item);
     const rows = item.breakdownRows || [];
     const qty = item.qty || 1;
 
@@ -11807,7 +12025,7 @@ function printQuote(){
       };
       return `<tr>
         <td>${it.mark||'-'}</td>
-        <td style="text-align:left;font-size:10px">${TYPE_LABEL[it.baseType]||it.baseType}</td>
+        <td style="text-align:left;font-size:10px">${applyTuoLabel(TYPE_LABEL[it.baseType]||it.baseType, it)}</td>
         <td>${it.W}</td><td>${it.H}</td><td>${it.qty}</td>
         <td style="text-align:right">${unit.toLocaleString('ko-KR')}</td>
         <td style="text-align:right">${Math.round(adj).toLocaleString('ko-KR')}</td>
@@ -12283,7 +12501,7 @@ function printQuoteWithSVG(){
             <div style="width:85px;height:65px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:auto">
               <img src="${it.wo.customImgData}" alt="이형" style="max-width:100%;max-height:100%;object-fit:contain">
             </div>
-            <div style="font-size:8px;color:#a04000;margin-top:1px;font-weight:700">⚠이형 ${it.W}×${it.H}mm</div>
+            <div style="font-size:8px;color:#a04000;margin-top:1px;font-weight:700">⚠${irrLabel(it.wo)} ${it.W}×${it.H}mm</div>
           </td>`;
       } else {
         svgCell = svg
@@ -12296,7 +12514,7 @@ function printQuoteWithSVG(){
       return `<tr>
         ${svgCell}
         <td>${it.mark||'-'}</td>
-        <td style="text-align:left;font-size:9px">${TYPE_LABEL[it.baseType]||it.baseType}</td>
+        <td style="text-align:left;font-size:9px">${applyTuoLabel(TYPE_LABEL[it.baseType]||it.baseType, it)}</td>
         <td>${it.W}</td><td>${it.H}</td><td>${it.qty}</td>
         <td style="text-align:right">${unit.toLocaleString('ko-KR')}</td>
         <td style="text-align:right">${Math.round(adj).toLocaleString('ko-KR')}</td>
@@ -12613,6 +12831,23 @@ function applyRounding(pageKey){
   return new Promise(r=>setTimeout(()=>{win.print();r()}, 800));
 }
 
+// 외부 색상 라벨 결정 ('블랙'/'화이트') — 절단·재고 차감 색상 판정용
+// 우선순위: wo.colorOut(한글) → snapshot.colorOut(black/white) → item.color → wo.blk → 화이트
+function _extColorLabel(item){
+  const wo = item && item.wo;
+  if(wo){
+    if(wo.colorOut === '블랙' || wo.colorOut === '화이트') return wo.colorOut;
+    if(wo.colorOut === 'black') return '블랙';
+    if(wo.colorOut === 'white') return '화이트';
+  }
+  const sc = item && item.snapshot && item.snapshot.colorOut;
+  if(sc === 'black' || sc === '블랙') return '블랙';
+  if(sc === 'white' || sc === '화이트') return '화이트';
+  if(item && (item.color === '블랙' || item.color === '화이트')) return item.color;
+  if(wo && wo.blk) return '블랙';
+  return '화이트';
+}
+
 function buildCutData(srcItems){
   // orderItems 전체를 순회해서 절단 항목 수집
   // srcItems 미지정 시 전역 orderItems 사용 (재고 연동에서 특정 프로젝트 항목 전달용)
@@ -12655,7 +12890,7 @@ function buildCutData(srcItems){
     const itemNo = `[${getDisplayNum(item, idx)}]`;
     const mark = `${itemNo}${item.mark ? ' '+item.mark : item.location ? ' '+item.location : ''}`.trim();
     if(!wo) return;
-    const col = item.color || (wo.blk?'블랙':'화이트');  // '블랙'/'화이트' 등
+    const col = _extColorLabel(item);  // 외부 색상('블랙'/'화이트') — 재고는 이 색으로 차감
 
     // ── 프레임: W+5, H+5, 각 2개 × qty ──
     acc('프레임', wo.frame.W + WELD, 2 * qty, mark, 'W', wo.ft, col);
@@ -13972,6 +14207,19 @@ function reopenScheduleWithBlank(){
 }
 function removeScheduleBlank(pos){ removeScheduleBlankAt(pos); }
 
+// 일람표 팝업에서 도면 라벨(이형/지붕창 등) 수정 → 갱신된 일람표 HTML 반환
+function editScheduleIrrLabel(id, label){
+  let iid = id;
+  if(typeof iid==='string'){ const n=parseInt(iid,10); if(!isNaN(n)) iid=n; }
+  const item = (typeof orderItems!=='undefined') ? orderItems.find(i=>i.id===iid) : null;
+  if(!item || !item.wo || !item.wo.customImgData) return null;
+  item.wo.customImgLabel = String(label==null?'':label).trim() || '이형';
+  try{ if(typeof markDirty==='function') markDirty(); }catch(_){}
+  try{ if(typeof renderItemList==='function') renderItemList(); }catch(_){}
+  try{ if(typeof refreshTable==='function') refreshTable(); }catch(_){}
+  return printWindowSchedule({returnHtml:true});
+}
+
 // 일람표 제목 설정 — 회사명/부제/제목/비고 편집 (localStorage 저장)
 const DEFAULT_SCHEDULE_TITLE = {company:'Decco KOREA', sub:'PASSIVE SYSTEM WINDOW', title:'데코 시스템 창호 일람표', note:'(실제작 사이즈)'};
 function _getScheduleTitle(){
@@ -14211,7 +14459,7 @@ async function printWindowSchedule(opts){
         const dateStr = i.cancelledAt ? (function(s){ try{ const d=new Date(s); return (d.getMonth()+1)+'/'+d.getDate(); }catch(_){return s;}})(i.cancelledAt) : '';
         return '<td class="draw-cell" style="border:1px solid #bbb;padding:1px;height:55mm;text-align:center;vertical-align:middle;overflow:hidden;background:#fafafa;position:relative">'+
           // 번호 뱃지 (회색으로)
-          '<div onclick="__schToggleBlank('+(groupStartIdx+gi+1)+')" title="클릭: 이 칸 앞에 공란 삽입" style="position:absolute;top:5px;left:6px;min-width:22px;height:22px;padding:0 6px;background:#888;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;line-height:1;z-index:10;border:2px solid #555;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;cursor:pointer">'+getDisplayNum(i, orderItems.indexOf(i))+'</div>'+
+          '<div class="sch-num" onclick="__schToggleBlank('+(groupStartIdx+gi+1)+')" title="클릭: 이 칸 앞에 공란 삽입" style="position:absolute;top:5px;left:6px;min-width:22px;height:22px;padding:0 6px;background:#888;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;line-height:1;z-index:10;border:2px solid #555;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;cursor:pointer">'+getDisplayNum(i, orderItems.indexOf(i))+'</div>'+
           // 우상단 "취소" 뱃지
           '<div style="position:absolute;top:5px;right:6px;background:#cc0000;color:#fff;font-size:10px;font-weight:900;padding:2px 8px;border-radius:9px;border:1.5px solid #800;z-index:10;letter-spacing:-0.3px">❌ 취소</div>'+
           // 중앙 큰 X표 (SVG, 빨강 굵은 선)
@@ -14258,11 +14506,11 @@ async function printWindowSchedule(opts){
         : '';
       
       return '<td class="draw-cell" style="border:1px solid #bbb;padding:1px;height:55mm;text-align:center;vertical-align:middle;overflow:visible;background:white;position:relative">'+
-        '<div onclick="__schToggleBlank('+(groupStartIdx+gi+1)+')" title="클릭: 이 칸 앞에 공란 삽입" style="position:absolute;top:5px;left:6px;min-width:22px;height:22px;padding:0 6px;background:#e00;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;line-height:1;z-index:10;border:2px solid #900;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;cursor:pointer">'+getDisplayNum(i, orderItems.indexOf(i))+'</div>'+
+        '<div class="sch-num" onclick="__schToggleBlank('+(groupStartIdx+gi+1)+')" title="클릭: 이 칸 앞에 공란 삽입" style="position:absolute;top:5px;left:6px;min-width:22px;height:22px;padding:0 6px;background:#e00;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;line-height:1;z-index:10;border:2px solid #900;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;cursor:pointer">'+getDisplayNum(i, orderItems.indexOf(i))+'</div>'+
         ((i.qty||1)>1 ? '<div style="position:absolute;top:30px;left:6px;min-width:28px;height:20px;padding:0 7px;background:#fff200;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#e00;line-height:1;z-index:10;border:2px solid #d4a500;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.15)" title="수량">×'+i.qty+'</div>' : '')+
         noteBadge+
         joinIndicator+
-        (i.wo && i.wo.customImgData ? '<div style="position:absolute;top:5px;right:6px;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:9px;border:1.5px solid #a04000;z-index:10">⚠ 이형</div>' : '')+
+        (i.wo && i.wo.customImgData ? '<div class="irr-edit" data-id="'+i.id+'" data-label="'+String(irrLabel(i.wo)).replace(/"/g,'&quot;')+'" title="클릭 → 라벨 수정 (이형/지붕창 등)" style="cursor:pointer;position:absolute;top:5px;right:6px;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:9px;border:1.5px solid #a04000;z-index:10">⚠ '+irrLabel(i.wo)+'</div>' : '')+
         '<div class="svg-wrapper" data-indiv-scale="1" data-window-key="'+(i.mark||'')+'|'+i.W+'x'+i.H+'" style="width:100%;height:100%;overflow:hidden;transform-origin:center center;transition:transform .15s ease-out">'+
         svgEmbed(i)+
         '</div>'+
@@ -14431,6 +14679,26 @@ async function printWindowSchedule(opts){
       if(f){ try{ Promise.resolve(f(p)).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){} }
       else { alert('공란 기능을 불러오지 못했습니다. 일람표를 새로 출력해 주세요.'); }
     }
+    // 창호 번호(빨간 원) 표시 토글 — 재렌더(공란 삽입 등) 후에도 상태 유지
+    function __schSetNum(on){
+      document.querySelectorAll('.page').forEach(function(p){
+        if(on) p.classList.remove('hide-num'); else p.classList.add('hide-num');
+      });
+      try{ localStorage.setItem('decco_sched_shownum', on ? '1' : '0'); }catch(e){}
+    }
+    function __schApplyNumState(){
+      var on = true;
+      try{ on = localStorage.getItem('decco_sched_shownum') !== '0'; }catch(e){}
+      var cb = document.getElementById('chk-sch-num');
+      if(cb) cb.checked = on;
+      __schSetNum(on);
+    }
+    // 팝업은 document.write로 그려지므로, 즉시 + 로드 후 + 지연으로 확실히 재적용
+    if(document.readyState !== 'loading') __schApplyNumState();
+    else document.addEventListener('DOMContentLoaded', __schApplyNumState);
+    window.addEventListener('load', __schApplyNumState);
+    setTimeout(__schApplyNumState, 60);
+    window.__schApplyNumState = __schApplyNumState;
     function __schRmBlank(p){
       var f=__schResolve('removeScheduleBlankAt');
       if(f){ try{ Promise.resolve(f(p)).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){} }
@@ -14442,6 +14710,7 @@ async function printWindowSchedule(opts){
       var sy = 0; try{ sy = window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0; }catch(e){}
       setTimeout(function(){
         try{ document.open(); document.write(h); document.close(); }catch(e){}
+        try{ setTimeout(function(){ if(window.__schApplyNumState) window.__schApplyNumState(); }, 60); }catch(_e){}
         try{ setTimeout(function(){ try{ window.scrollTo(0, sy); }catch(_e){} }, 40); }catch(e){}
       }, 0);
     }
@@ -14454,6 +14723,19 @@ async function printWindowSchedule(opts){
       var btn = bar.querySelector('button'); if(btn) btn.textContent = collapsed?'펴기 ▸':'접기 ▾';
       var f=__schResolve('setBlankBarCollapsed'); if(f){ try{ f(collapsed); }catch(e){} }
     }
+    // 도면 라벨(이형/지붕창 등) 뱃지 클릭 → opener 편집 함수 호출 후 자기 자신 다시 그리기
+    document.addEventListener('click', function(ev){
+      var t = ev.target && ev.target.closest ? ev.target.closest('.irr-edit') : null;
+      if(!t) return;
+      ev.preventDefault(); ev.stopPropagation();
+      var id  = t.getAttribute('data-id');
+      var cur = t.getAttribute('data-label') || '이형';
+      var f = __schResolve('editScheduleIrrLabel');
+      if(!f){ alert('라벨 편집 기능을 불러오지 못했습니다. 일람표를 새로 출력해 주세요.'); return; }
+      var v = prompt('도면 라벨을 입력하세요.\\n예) 이형, 지붕창, 곡면창, 특수창', cur);
+      if(v===null) return;
+      try{ Promise.resolve(f(id, v)).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){}
+    });
   <\/script>`;
 
   const _st = _getScheduleTitle();
@@ -14467,6 +14749,8 @@ async function printWindowSchedule(opts){
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:12px;background:#fff;color:#111;padding:4px}
   .page{width:210mm;margin:0 auto;padding:6px 10px}
+  /* 창호 번호(빨간 원 숫자) 숨김 — 부호(PW1 등)와 헷갈리지 않게 필요 시 끄기 */
+  .page.hide-num .sch-num{display:none !important}
   .header-wrap{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px;border-bottom:2px solid #1a2a50;padding-bottom:2px}
   .header-left{font-size:11px;line-height:2}
   .header-center{text-align:center;flex:1}
@@ -14565,6 +14849,7 @@ async function printWindowSchedule(opts){
 <body>
 <div class="ctrl-bar">
   <span>도면 정보:</span>
+  <label style="margin-left:14px"><input type="checkbox" id="chk-sch-num" checked onchange="__schSetNum(this.checked)"> 창호 번호</label>
   <label><input type="checkbox" id="chk-cell-info" onchange="document.querySelectorAll('.page').forEach(function(p){this.checked?p.classList.remove('hide-info'):p.classList.add('hide-info')},this)"> m² / 평 / kg 표시</label>
 </div>
 <div class="page hide-info">
@@ -15648,7 +15933,7 @@ function printWorkOrders(){
         </tr>
         <tr>
           <td style="${lbl}">창호 타입</td>
-          <td colspan="3" style="${val}font-weight:700">${typeLabel}${wo.customImgData?' <span style="display:inline-block;background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;border:1.5px solid #a04000;margin-left:6px;vertical-align:middle">⚠ 이형</span>':''}</td>
+          <td colspan="3" style="${val}font-weight:700">${typeLabel}${wo.customImgData?' <span style="display:inline-block;background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;border:1.5px solid #a04000;margin-left:6px;vertical-align:middle">⚠ ${irrLabel(wo)}</span>':''}</td>
         </tr>
         <tr>
           <td style="${lbl}">색 상</td>
@@ -15786,6 +16071,31 @@ function printWorkOrders(){
   <button onclick="window.print()">🖨 인쇄</button>
 </div>
 <div class="wo-root hide-cell-info">${pages}</div>
+<script>
+  // 작업지시서 A4 페이지 자동 맞춤 — 내용이 A4 높이를 넘으면 zoom으로 축소
+  // ※ transform이 아니라 zoom을 쓰는 이유: zoom은 레이아웃 높이까지 실제로 줄여주므로
+  //    다음 페이지를 침범(겹침)하지 않는다.
+  (function(){
+    var PX_PER_MM = 96/25.4;
+    // A4(297mm) − @page 여백(위/아래 5mm) − wo-page padding(위/아래 3mm) ≈ 279mm 여유
+    var MAX_H = 279 * PX_PER_MM;
+    function fitWoPages(){
+      var pages = document.querySelectorAll('.wo-page');
+      pages.forEach(function(p){
+        p.style.zoom = '';                         // 초기화 후 자연 높이 측정
+        var h = p.getBoundingClientRect().height;
+        if(h > MAX_H){
+          var k = Math.max(0.6, MAX_H / h);        // 과도 축소 방지(최소 60%)
+          p.style.zoom = k;                        // 레이아웃까지 축소 → 겹침 없음
+        }
+      });
+    }
+    window.__fitWoPages = fitWoPages;
+    if(document.readyState === 'complete') setTimeout(fitWoPages, 80);
+    else window.addEventListener('load', function(){ setTimeout(fitWoPages, 80); });
+    window.addEventListener('beforeprint', fitWoPages);
+  })();
+<\/script>
 </body></html>`);
   win.document.close();
   return new Promise(r=>setTimeout(()=>{win.print();r()}, 500));
@@ -21456,6 +21766,43 @@ function _invCouplers(srcItems){
   return {matched, unmatched};
 }
 
+const INV_GB_LOSS = 1.20; // GB 로스율 20% 추가
+function _invGBConsumption(srcItems){
+  const items = Array.isArray(srcItems) ? srcItems : [];
+  let gb47M = 0, gb24M = 0; // 누적 둘레(m)
+  for(const item of items){
+    if(!item || item.cancelled || !item.wo) continue;
+    const qty = item.qty || 1;
+    const gbType = (item.snapshot && item.snapshot.gbType) || 'GB47';
+    let perimM = 0; // 이 항목 유리들의 둘레 합(m, 수량 미반영)
+    const addGlass = g => {
+      const gW = (g && g.glassW) || 0, gH = (g && g.glassH) || 0;
+      if(!gW || !gH) return;
+      perimM += (2 * ((gW + 14) + (gH + 14))) / 1000;
+    };
+    if(Array.isArray(item.wo.sashs))      item.wo.sashs.forEach(addGlass);
+    if(Array.isArray(item.wo.fixGlasses)) item.wo.fixGlasses.forEach(addGlass);
+    const lenM = perimM * qty; // 수량 반영 누적 둘레
+    if(lenM <= 0) continue;
+    if(gbType === 'GB47_2')       gb47M += lenM * 2;            // 47+47 (둘레 ×2)
+    else if(gbType === 'GB47_24'){ gb47M += lenM; gb24M += lenM; } // 47+24 (각각 1줄)
+    else                          gb47M += lenM;                // GB47
+  }
+  const lines = [];
+  const bars = m => Math.ceil((m * INV_GB_LOSS) / 6); // 6m 바, 로스 20% 추가
+  if(gb47M > 0){
+    const b = bars(gb47M);
+    lines.push({field:'linkCode', value:'GB47', label:'GB47 (글레이징비드)', color:'공용', unit:'본', qty:b,
+      detail:gb47M.toFixed(2)+'m ×1.2 ÷6 → '+b+'본'});
+  }
+  if(gb24M > 0){
+    const b = bars(gb24M);
+    lines.push({field:'linkCode', value:'GB24', label:'GB24 (글레이징비드)', color:'공용', unit:'본', qty:b,
+      detail:gb24M.toFixed(2)+'m ×1.2 ÷6 → '+b+'본'});
+  }
+  return lines;
+}
+
 /* ---------- 소요량 계산 (해당 프로젝트 항목으로부터) ---------- */
 function invComputeConsumption(srcItems){
   const loss = (parseFloat(document.getElementById('loss-rate')?.value) || 15);
@@ -21492,6 +21839,8 @@ function invComputeConsumption(srcItems){
   }
   const cpl = _invCouplers(srcItems || []);
   for(const c of cpl.matched) lines.push(c);
+  // GB(글레이징 비드) — GB 절단 리스트 둘레 기반, 6m 바 환산
+  for(const gb of _invGBConsumption(srcItems || [])) lines.push(gb);
   const unmatched = [];
   for(const k in unmatchedMap){
     const u = unmatchedMap[k];
