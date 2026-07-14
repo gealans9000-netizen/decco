@@ -14442,7 +14442,7 @@ async function printWindowSchedule(opts){
 
     const typeLabel = i => {
       if(!i) return '';
-      return TYPE_LABEL[i.baseType] || i.baseType || '-';
+      return applyTuoLabel(TYPE_LABEL[i.baseType] || i.baseType || '-', i);
     };
 
     const lbl = txt => `<td style="border:1px solid #bbb;padding:0;background:#e0e0e0;width:14px;min-width:14px;max-width:14px;overflow:hidden;vertical-align:middle;text-align:center"><span style="display:inline-block;writing-mode:vertical-rl;text-orientation:upright;font-weight:700;font-size:9px;letter-spacing:-1px;line-height:1">${txt}</span></td>`;
