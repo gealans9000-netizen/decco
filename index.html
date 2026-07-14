@@ -14849,7 +14849,7 @@ async function printWindowSchedule(opts){
 <body>
 <div class="ctrl-bar">
   <span>도면 정보:</span>
-  <label style="margin-left:14px"><input type="checkbox" id="chk-sch-num" checked onchange="__schSetNum(this.checked)"> 창호 번호</label>
+  <label style="margin-left:14px"><input type="checkbox" id="chk-sch-num" checked onchange="var v=this.checked;document.querySelectorAll('.page').forEach(function(p){v?p.classList.remove('hide-num'):p.classList.add('hide-num')});try{localStorage.setItem('decco_sched_shownum',v?'1':'0')}catch(e){}"> 창호 번호</label>
   <label><input type="checkbox" id="chk-cell-info" onchange="document.querySelectorAll('.page').forEach(function(p){this.checked?p.classList.remove('hide-info'):p.classList.add('hide-info')},this)"> m² / 평 / kg 표시</label>
 </div>
 <div class="page hide-info">

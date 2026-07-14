@@ -1140,7 +1140,19 @@ async function genPcOutput(kind){
 
 // HTML 문서를 뷰어에 표시 (iframe srcdoc + 화면폭 맞춤)
 function renderHtmlIntoDocPaper(html){
-  const safe = String(html||'').replace(/<script[\s\S]*?<\/script>/gi,'');
+  // PC 일람표의 script는 보안상 제거 (체크박스는 인라인 onchange라 script 없이도 동작)
+  let safe = String(html||'').replace(/<script[\s\S]*?<\/script>/gi,'');
+  // '창호 번호' 저장된 on/off 상태를 초기 클래스/체크상태로 반영
+  if(/class="sch-num"/.test(safe) || /id="chk-sch-num"/.test(safe)){
+    let on = true;
+    try{ on = localStorage.getItem('decco_sched_shownum') !== '0'; }catch(e){}
+    if(!on){
+      safe = safe.replace(/<div class="page([^"]*)"/g, (m0, cls)=> '<div class="page'+cls+' hide-num"')
+                 .replace(/<input([^>]*id="chk-sch-num"[^>]*)>/g, function(m0, attrs){
+                   return '<input' + attrs.replace(/\schecked(?=[\s>=])|\schecked$/, '') + '>';
+                 });
+    }
+  }
   const srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:6px 8px;background:#fff;font-family:'Malgun Gothic','Noto Sans KR',sans-serif;color:#111}</style></head><body>${safe}</body></html>`;
   $('doc-paper').innerHTML = `<div id="baked-wrap" style="overflow:hidden;background:#fff"><iframe id="baked-frame" style="width:800px;border:0;display:block;background:#fff" scrolling="no"></iframe></div>`;
   const fr = $('baked-frame');
