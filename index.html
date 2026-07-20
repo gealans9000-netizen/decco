@@ -3445,7 +3445,7 @@ function buildBulkBar(){
     {f:'location', label:'위치',     type:'text', ph:'거실'},
     {f:'buildType',label:'TYPE (건물구조)', type:'select', opts:[['','-'],['목조','목조'],['RC','RC'],['판넬','판넬']]},
     {f:'notes',    label:'전체 특기사항', type:'text', ph:'예: 모든 창호 공통 사항'},
-    {f:'colorOut', label:'외부창 색상', type:'select', opts:[['white','화이트'],['black','블랙']]},
+    {f:'colorOut', label:'외부창 색상', type:'select', opts:[['white','화이트'],['black','블랙'],['painting_out','도장'],['wrapping_out','랩핑']]},
     {f:'colorIn',  label:'내부창 색상', type:'select', opts:[['white','화이트'],['black','블랙']]},
     {f:'tapingSel',label:'기밀테이프',  type:'select', opts:[['both','내+외부'],['in','내부'],['out','외부'],['none','없음']]},
     {f:'pieceholeSel', label:'피스홀', type:'select', opts:[['yes','있음'],['no','없음']]},
@@ -3546,7 +3546,7 @@ function buildRow(item, idx){
     '<td><select onchange="update('+item.id+',\\'buildType\\',this.value)">'+btOpts+'</select></td>' +
     '<td><input value="'+esc(item.notes)+'" onblur="update('+item.id+',\\'notes\\',this.value)" oninput="debouncedUpdate('+item.id+',\\'notes\\',this.value)"></td>' +
     '<td><input value="'+esc(item.itemNote||'')+'" onblur="update('+item.id+',\\'itemNote\\',this.value)" oninput="debouncedUpdate('+item.id+',\\'itemNote\\',this.value)" placeholder="이 창호만"></td>' +
-    '<td><select onchange="update('+item.id+',\\'colorOut\\',this.value)"><option value="white"'+(colorOut==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorOut==='black'?' selected':'')+'>블랙</option></select></td>' +
+    '<td><select onchange="update('+item.id+',\\'colorOut\\',this.value)"><option value="white"'+(colorOut==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorOut==='black'?' selected':'')+'>블랙</option><option value="painting_out"'+(colorOut==='painting_out'?' selected':'')+'>도장</option><option value="wrapping_out"'+(colorOut==='wrapping_out'?' selected':'')+'>랩핑</option></select></td>' +
     '<td><select onchange="update('+item.id+',\\'colorIn\\',this.value)"><option value="white"'+(colorIn==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorIn==='black'?' selected':'')+'>블랙</option></select></td>' +
     '<td><select onchange="update('+item.id+',\\'tapingSel\\',this.value)"><option value="both"'+(taping==='both'?' selected':'')+'>내+외부</option><option value="in"'+(taping==='in'?' selected':'')+'>내부</option><option value="out"'+(taping==='out'?' selected':'')+'>외부</option><option value="none"'+(taping==='none'?' selected':'')+'>없음</option></select></td>' +
     '<td><select onchange="update('+item.id+',\\'pieceholeSel\\',this.value)"><option value="yes"'+(piece==='yes'?' selected':'')+'>있음</option><option value="no"'+(piece==='no'?' selected':'')+'>없음</option></select></td>' +
