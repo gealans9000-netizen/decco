@@ -3536,7 +3536,7 @@ function buildRow(item, idx){
 
   return '<tr '+rowStyle+'>' +
     '<td class="sticky-col sticky-col-1" style="text-align:center'+(item.cancelled?';background:#ffe0e0':'')+'"><span class="num-pill"'+(item.cancelled?' style="background:#888;border-color:#555"':'')+'>'+displayNum+'</span>'+(item.cancelled?'<br><span style="font-size:9px;color:#cc0000;font-weight:900;letter-spacing:-0.5px">❌ 취소</span>':'')+'</td>' +
-    '<td class="sticky-col sticky-col-2" style="text-align:center"><span class="type-label">'+(TYPE_LABEL_SHORT[item.baseType]||item.baseType)+'</span>'+(item.wo&&item.wo.customImgData?'<br><span style="display:inline-block;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:0 5px;border-radius:7px;border:1px solid #a04000;margin-top:2px" title="이형">⚠ ${irrLabel(item.wo)}</span>':'')+'</td>' +
+    '<td class="sticky-col sticky-col-2" style="text-align:center"><span class="type-label">'+(TYPE_LABEL_SHORT[item.baseType]||item.baseType)+'</span>'+(item.wo&&item.wo.customImgData?'<br><span style="display:inline-block;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:0 5px;border-radius:7px;border:1px solid #a04000;margin-top:2px" title="이형">⚠ '+((item.wo&&item.wo.customImgLabel)||'이형')+'</span>':'')+'</td>' +
     '<td class="sticky-col sticky-col-3" style="text-align:center"><span class="dim">'+item.W+'×'+item.H+'</span></td>' +
     '<td class="sticky-col sticky-col-4"><input type="number" min="1" value="'+(item.qty||1)+'" onchange="update('+item.id+',\\'qty\\',this.value);refreshTable()" style="text-align:center;font-weight:700"></td>' +
     '<td><input value="'+esc(item.company)+'" onblur="update('+item.id+',\\'company\\',this.value)"></td>' +
