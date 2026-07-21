@@ -1475,6 +1475,10 @@ W × H / 91809 = 평 (최소 3평), 평 × 단가/평
           <input type="checkbox" id="chk-labor-cost" style="accent-color:#0d7a6f;width:13px;height:13px">
           🔧 임가공비
         </label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#0d7a6f;cursor:pointer;margin-top:6px">
+          <input type="checkbox" id="chk-release-note" style="accent-color:#0d7a6f;width:13px;height:13px">
+          📦 출고증
+        </label>
 
         <!-- 일괄출력 + 엑셀 버튼 -->
         <div style="display:flex;gap:5px;margin-top:4px">
@@ -8915,6 +8919,7 @@ async function batchPrint(){
   const chkCostReview = document.getElementById('chk-cost-review')?.checked;
   const chkMatSummary = document.getElementById('chk-material-summary')?.checked;
   const chkLaborCost = document.getElementById('chk-labor-cost')?.checked;
+  const chkReleaseNote = document.getElementById('chk-release-note')?.checked;
   if(!chkSched && !chkWork && !chkCut && !chkGlass && !chkScreen && !chkFrameInner && !chkGB && !chkLabel && !chkQuote && !chkQuoteSVG && !chkCostReview && !chkMatSummary && !chkLaborCost){alert('출력할 항목을 1개 이상 선택하세요.');return}
 
   // 각 섹션 HTML 수집
@@ -8975,6 +8980,10 @@ async function batchPrint(){
     if(chkLaborCost){
       const h = getBatchLaborCostHTML();
       if(h) sections.push({title:'데코 임가공 비용 정산', html:h});
+    }
+    if(chkReleaseNote){
+      const h = getReleaseNoteHTML();
+      if(h) sections.push({title:'출고증', html:h});
     }
   } catch(err){
     console.error('[batchPrint] 섹션 생성 중 에러:', err);
@@ -11363,6 +11372,151 @@ function restoreFromOrder(id){
 // ────────────────────────────────────────────────
 // 견적서 출력 / CSV
 // ────────────────────────────────────────────────
+// ── 출고증 (인수자용 / 보관용 2부) ──────────────────────────────
+function _relEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _relToday(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return { y:d.getFullYear(), m:p(d.getMonth()+1), d:p(d.getDate()),
+           dot:`${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}` };
+}
+function _relNextDay(){
+  const d = new Date(); d.setDate(d.getDate()+1);
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}`;
+}
+// 현장별로 창호를 묶어 출고 품목 행을 만든다
+function _relBuildItems(){
+  const live = (typeof orderItems!=='undefined'?orderItems:[]).filter(it=>it && !it.cancelled);
+  const groups = {};   // key: 현장명 → {name, sizes:[[w,h,area]], qty}
+  live.forEach(it=>{
+    const site = (it.site || (it.snapshot&&it.snapshot.siteName) || '').trim() || '현장';
+    if(!groups[site]) groups[site] = { name:site, first:null, qty:0, cnt:0 };
+    const g = groups[site];
+    g.qty += (it.qty||1);
+    g.cnt += 1;
+    if(!g.first && it.W && it.H) g.first = `${it.W} X ${it.H}`;
+  });
+  const rows = [];
+  Object.keys(groups).forEach(k=>{
+    const g = groups[k];
+    rows.push({
+      name: g.name + ' 시스템 창호',
+      spec: (g.first||'-') + (g.cnt>1 ? ' 외' : ''),
+      qty:  g.qty + 'set',
+      note: '생산품목'
+    });
+  });
+  return rows;
+}
+// 납품처(받는곳) 표기: "업체명(현장1, 현장2 ...)" 형태
+function _relDeliveryTo(){
+  const live = (typeof orderItems!=='undefined'?orderItems:[]).filter(it=>it && !it.cancelled);
+  let co = (document.getElementById('companyName')?.value||'').trim();
+  if(!co && live.length){ const i0=live.find(i=>i.company)||live[0]; co = i0.company||(i0.snapshot&&i0.snapshot.companyName)||''; }
+  const sites = [];
+  live.forEach(it=>{ const sv=(it.site||(it.snapshot&&it.snapshot.siteName)||'').trim(); if(sv && sites.indexOf(sv)<0) sites.push(sv); });
+  const siteStr = sites.length ? '('+sites.join(', ')+')' : '';
+  return (co||'') + siteStr || '-';
+}
+// 편집 가능한 셀 (contenteditable)
+function _relCell(v, extra){
+  return `<span contenteditable="true" style="outline:none;${extra||''}">${_relEsc(v)}</span>`;
+}
+// 출고증 1부 HTML
+function _relOnePart(partLabel, t){
+  const items = _relBuildItems();
+  const deliverTo = _relDeliveryTo();
+  const MAX_ROWS = 6;
+  let bodyRows = '';
+  for(let i=0;i<MAX_ROWS;i++){
+    const r = items[i];
+    bodyRows += `<tr>
+      <td class="rn-c" style="width:34px">${i+1}</td>
+      <td class="rn-l">${r?_relCell(r.name):'&nbsp;'}</td>
+      <td class="rn-c" style="width:150px">${r?_relCell(r.spec):'&nbsp;'}</td>
+      <td class="rn-c" style="width:70px">${r?_relCell(r.qty):'&nbsp;'}</td>
+      <td class="rn-l" style="width:90px">${r?_relCell(r.note):'&nbsp;'}</td>
+    </tr>`;
+  }
+  return `
+  <div class="rn-part">
+    <div class="rn-tag">[ ${partLabel} ]</div>
+    <div class="rn-title">출  고  증</div>
+    <div class="rn-top">
+      <div>출고일자: ${_relCell(t.y+'년 '+t.m+'월 '+t.d+'일')}</div>
+      <div>출고업체: <b>게알란코리아</b></div>
+    </div>
+
+    <div class="rn-sec">■ 기본 정보</div>
+    <table class="rn-tbl">
+      <tr>
+        <td class="rn-h" style="width:110px">납품처 (받는곳)</td>
+        <td class="rn-l">${_relCell(deliverTo)}</td>
+        <td class="rn-h" style="width:110px">인수자 (전화)</td>
+        <td class="rn-l" style="width:150px">${_relCell('')}</td>
+      </tr>
+    </table>
+
+    <div class="rn-sec">■ 출고 품목</div>
+    <table class="rn-tbl">
+      <tr class="rn-hd">
+        <td class="rn-h">No</td><td class="rn-h">품  목  명</td>
+        <td class="rn-h">규  격</td><td class="rn-h">수 량</td><td class="rn-h">비  고</td>
+      </tr>
+      ${bodyRows}
+    </table>
+
+    <div class="rn-sec">■ 운송 정보</div>
+    <table class="rn-tbl">
+      <tr>
+        <td class="rn-h" style="width:80px">운송차량</td><td class="rn-l">${_relCell('')}</td>
+        <td class="rn-h" style="width:80px">운송형태</td><td class="rn-l" style="width:120px">${_relCell('')}</td>
+      </tr>
+      <tr>
+        <td class="rn-h">운송기사</td><td class="rn-l">${_relCell('')}</td>
+        <td class="rn-h">차량번호</td><td class="rn-l">${_relCell('')}</td>
+      </tr>
+    </table>
+
+    <div class="rn-sec">■ 서명</div>
+    <table class="rn-tbl">
+      <tr>
+        <td class="rn-h" style="width:80px">인수자</td><td class="rn-l">${_relCell('')}</td>
+        <td class="rn-h" style="width:90px">확인 날짜</td><td class="rn-c" style="width:130px">${_relCell(t.next)}</td>
+        <td class="rn-h" style="width:70px">서 명</td><td class="rn-l" style="width:90px">&nbsp;</td>
+      </tr>
+    </table>
+    <div class="rn-foot">※ 파손 및 누락은 현장 확인 후 즉시 통보 바랍니다.</div>
+  </div>`;
+}
+function getReleaseNoteHTML(){
+  const td = _relToday();
+  const t = { y:td.y, m:td.m, d:td.d, next:_relNextDay() };
+  const style = `<style>
+    .rn-wrap{font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#111;max-width:190mm;margin:0 auto;padding:2mm}
+    .rn-part{border:2px solid #222;padding:8px 12px 10px;margin-bottom:6px}
+    .rn-tag{font-size:12px;font-weight:800;color:#444}
+    .rn-title{text-align:center;font-size:24px;font-weight:900;letter-spacing:10px;margin:-14px 0 6px}
+    .rn-top{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin:4px 0 8px;padding:0 2px}
+    .rn-sec{font-size:12px;font-weight:800;margin:8px 0 3px;color:#1a2340}
+    .rn-tbl{width:100%;border-collapse:collapse;font-size:12px}
+    .rn-tbl td{border:1px solid #999;padding:5px 7px;vertical-align:middle;height:26px}
+    .rn-h{background:#eef1f5;font-weight:700;text-align:center;white-space:nowrap}
+    .rn-hd .rn-h{background:#dfe4ec}
+    .rn-c{text-align:center}
+    .rn-l{text-align:left}
+    .rn-foot{font-size:11px;color:#b00;font-weight:700;margin-top:6px}
+    .rn-scissor{text-align:center;color:#888;font-size:12px;letter-spacing:2px;margin:2px 0}
+    @media print{ .rn-part{page-break-inside:avoid} }
+  </style>`;
+  return `${style}<div class="rn-wrap">
+    ${_relOnePart('인수자용', t)}
+    <div class="rn-scissor">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
+    ${_relOnePart('보관용', t)}
+  </div>`;
+}
+
 // 출력물용 현장명(크게) + 내/외부 색상 밴드
 function _siteColorBar(){
   let co=(document.getElementById('companyName')?.value||'').trim();
