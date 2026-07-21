@@ -11533,11 +11533,14 @@ function getReleaseNoteHTML(){
   const sites = _relSiteList();
   // 현장 선택 바 (현장 2곳 이상일 때만) — 체크한 현장만 출고증에 표시
   let siteBar = '';
-  if(sites.length > 1){
+  if(sites.length >= 1){
     const chips = sites.map(sv=>`<label class="rn-chip"><input type="checkbox" class="rn-sitechk" value="${_relEsc(sv)}" checked> ${_relEsc(sv)}</label>`).join('');
+    const hint = sites.length > 1
+      ? '체크한 현장만 출고증에 포함됩니다 (인쇄 시 이 줄은 안 나옴)'
+      : '현장 1곳 — 여러 현장을 함께 출고하려면 클라우드에서 현장을 더 불러오세요 (인쇄 시 이 줄은 안 나옴)';
     siteBar = `<div class="rn-sitebar no-print">
-      <b>출고 현장 선택:</b> ${chips}
-      <span class="rn-hint">체크한 현장만 출고증에 포함됩니다 (인쇄 시 이 줄은 안 나옴)</span>
+      <b>출고 현장 선택 (${sites.length}):</b> ${chips}
+      <span class="rn-hint">${hint}</span>
     </div>`;
   }
   const syncScript = `<script>(function(){
