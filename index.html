@@ -8905,6 +8905,7 @@ function updateBulkBar(){
 
 // ── 일괄 출력 (단일 창에 병합) ──
 async function batchPrint(){
+  window._relExtraSites = [];   // 출고증: 이전 세션의 클라우드 추가 현장 초기화
   if(!orderItems.length){alert('견적 목록이 없습니다.');return}
   const chkSched   = document.getElementById('chk-schedule')?.checked;
   const chkWork    = document.getElementById('chk-workorder')?.checked;
@@ -9033,13 +9034,15 @@ body{margin:0;padding:0;font-family:'Malgun Gothic',sans-serif}
   @page{margin:3mm}
   /* 다음 섹션이 있으면 현재 섹션 마지막의 강제 개행 무효화 */
   .section-break{page-break-before:always !important}
+  /* 화면 전용 UI(현장 선택 바 등)는 인쇄에서 숨김 */
+  .no-print{display:none !important}
 }
 <style>
 .rn-print-bar{position:sticky;top:0;z-index:9999;background:#0d7a6f;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:12px;font-family:'Malgun Gothic',sans-serif;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .rn-print-bar button{background:#fff;color:#0d7a6f;border:none;padding:6px 16px;border-radius:6px;font-weight:800;font-size:13px;cursor:pointer}
 .rn-print-bar span{opacity:.95}
 @media print{ .rn-print-bar{display:none !important} }
-</style></head><body>${chkReleaseNote?'<div class="rn-print-bar no-print"><button onclick="window.print()">🖨 인쇄 / PDF 저장</button><span>빈 칸(인수자·운송정보 등)을 클릭해 입력한 뒤 인쇄하세요.</span></div>':''}${combined}
+</style></head><body>${combined}
 <script>
 // BOM Calculator 팝업 — 원가 검토에서 사용
 function openBomPopup(type, w, h, qty, rail, dir, mark){
@@ -11396,41 +11399,44 @@ function _relNextDay(){
   return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}`;
 }
 // 현장별로 창호를 묶어 출고 품목 행을 만든다
-function _relBuildItems(){
-  const live = (typeof orderItems!=='undefined'?orderItems:[]).filter(it=>it && !it.cancelled);
-  const groups = {};   // key: 현장명 → {name, sizes:[[w,h,area]], qty}
-  live.forEach(it=>{
+// 출고증에 합쳐질 "추가 현장"(클라우드에서 체크로 불러온 것) 버퍼
+window._relExtraSites = window._relExtraSites || [];   // [{site, company, name, spec, qty}]
+// 창호 배열 → 현장별 그룹 요약 (현재작업분/클라우드 공용)
+function _relGroupItems(items){
+  const groups = {};
+  (items||[]).forEach(it=>{
+    if(!it || it.cancelled) return;
     const site = (it.site || (it.snapshot&&it.snapshot.siteName) || '').trim() || '현장';
-    if(!groups[site]) groups[site] = { name:site, first:null, qty:0, cnt:0 };
+    const co   = (it.company || (it.snapshot&&it.snapshot.companyName) || '').trim();
+    if(!groups[site]) groups[site] = { name:site, company:co, first:null, qty:0, cnt:0 };
     const g = groups[site];
-    g.qty += (it.qty||1);
-    g.cnt += 1;
+    if(!g.company && co) g.company = co;
+    g.qty += (it.qty||1); g.cnt += 1;
     if(!g.first && it.W && it.H) g.first = `${it.W} X ${it.H}`;
   });
-  const rows = [];
-  Object.keys(groups).forEach(k=>{
+  return Object.keys(groups).map(k=>{
     const g = groups[k];
-    rows.push({
-      site: g.name,
+    return { site:g.name, company:g.company,
       name: g.name + ' 시스템 창호',
       spec: (g.first||'-') + (g.cnt>1 ? ' 포함' : ''),
-      qty:  g.qty + 'SET',
-      note: '생산품목'
-    });
+      qty:  g.qty + 'SET', note:'생산품목' };
   });
+}
+function _relBuildItems(){
+  const live = (typeof orderItems!=='undefined'?orderItems:[]);
+  const rows = _relGroupItems(live);
+  // 추가 현장(클라우드) 병합 — 같은 현장명은 중복 제외
+  const seen = {}; rows.forEach(r=>seen[r.site]=true);
+  (window._relExtraSites||[]).forEach(r=>{ if(!seen[r.site]){ rows.push(r); seen[r.site]=true; } });
   return rows;
 }
-// 현장 목록 (선택 UI용)
-function _relSiteList(){
-  return _relBuildItems().map(r=>r.site);
-}
-// 납품처(받는곳) 표기: "업체명(현장1, 현장2 ...)" 형태
+function _relSiteList(){ return _relBuildItems().map(r=>r.site); }
+// 납품처(받는곳) 표기: "업체명(현장1, 현장2 ...)"
 function _relDeliveryTo(){
-  const live = (typeof orderItems!=='undefined'?orderItems:[]).filter(it=>it && !it.cancelled);
+  const rows = _relBuildItems();
   let co = (document.getElementById('companyName')?.value||'').trim();
-  if(!co && live.length){ const i0=live.find(i=>i.company)||live[0]; co = i0.company||(i0.snapshot&&i0.snapshot.companyName)||''; }
-  const sites = [];
-  live.forEach(it=>{ const sv=(it.site||(it.snapshot&&it.snapshot.siteName)||'').trim(); if(sv && sites.indexOf(sv)<0) sites.push(sv); });
+  if(!co){ const r0 = rows.find(r=>r.company); if(r0) co = r0.company; }
+  const sites = rows.map(r=>r.site).filter(Boolean);
   const siteStr = sites.length ? '('+sites.join(', ')+')' : '';
   return (co||'') + siteStr || '-';
 }
@@ -11507,6 +11513,76 @@ function _relOnePart(partLabel, t){
     <div class="rn-foot">※ 파손 및 누락은 현장 확인 후 즉시 통보 바랍니다.</div>
   </div>`;
 }
+// ── 출고증: 클라우드 현장 추가 (부모 창에서 실행, 모달로 선택) ──
+async function relPickCloudSites(){
+  let projects = [];
+  try{ projects = await listCloudProjects(); }
+  catch(e){ alert('클라우드 목록을 불러오지 못했습니다.'); return; }
+  if(!projects || !projects.length){ alert('클라우드에 저장된 현장이 없습니다.'); return; }
+  // 각 프로젝트에서 현장 요약 뽑기
+  const opts = projects.map(pr=>{
+    const items = (pr.data && pr.data.orderItems) ? pr.data.orderItems : [];
+    const rows = _relGroupItems(items);
+    return { id:pr.id, projName: pr.name || (rows[0]&&rows[0].site) || '(무제목)', rows };
+  }).filter(o=>o.rows.length);
+  if(!opts.length){ alert('선택 가능한 현장 데이터가 없습니다.'); return; }
+
+  // 이미 추가된 현장 표시
+  const already = {}; (window._relExtraSites||[]).forEach(r=>already[r.site]=true);
+
+  const ov = document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
+  let listHtml='';
+  opts.forEach((o,oi)=>{
+    o.rows.forEach((r,ri)=>{
+      const dis = already[r.site] ? 'disabled checked' : '';
+      const tag = already[r.site] ? ' <span style="color:#0d7a6f;font-size:11px">(추가됨)</span>' : '';
+      listHtml += `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #eee;cursor:pointer;font-size:13px">
+        <input type="checkbox" class="rel-cloud-chk" data-oi="${oi}" data-ri="${ri}" ${dis} style="width:15px;height:15px">
+        <b>${_relEsc(r.site)}</b> <span style="color:#666">— ${_relEsc(r.spec)} / ${_relEsc(r.qty)}</span>${tag}
+        <span style="color:#aaa;font-size:11px;margin-left:auto">${_relEsc(o.projName)}</span>
+      </label>`;
+    });
+  });
+  ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px 22px;width:520px;max-width:92%;max-height:80vh;overflow:auto;box-shadow:0 12px 44px rgba(0,0,0,.3)">
+    <div style="font-size:16px;font-weight:800;margin-bottom:6px">📦 출고증에 추가할 현장 선택</div>
+    <div style="font-size:12px;color:#666;margin-bottom:12px">클라우드에 저장된 현장입니다. 체크한 현장이 현재 출고증에 합쳐집니다(현재 작업 목록은 바뀌지 않습니다).</div>
+    <div style="border:1px solid #ddd;border-radius:8px;overflow:hidden;margin-bottom:14px">${listHtml}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button id="rel-cloud-cancel" style="background:#eee;border:none;padding:8px 16px;border-radius:6px;cursor:pointer">취소</button>
+      <button id="rel-cloud-ok" style="background:#0d7a6f;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-weight:700;cursor:pointer">추가</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  return new Promise(resolve=>{
+    ov.querySelector('#rel-cloud-cancel').onclick=()=>{ ov.remove(); resolve(false); };
+    ov.querySelector('#rel-cloud-ok').onclick=()=>{
+      const chosen = ov.querySelectorAll('.rel-cloud-chk:checked:not([disabled])');
+      chosen.forEach(cb=>{
+        const o = opts[+cb.getAttribute('data-oi')];
+        const r = o.rows[+cb.getAttribute('data-ri')];
+        if(r && !(window._relExtraSites||[]).some(x=>x.site===r.site)) window._relExtraSites.push(r);
+      });
+      ov.remove(); resolve(true);
+    };
+  });
+}
+// 출고증 팝업에서 호출 → 선택 후 팝업을 새 출고증 HTML로 다시 그림
+async function relAddCloudAndRefresh(popupWin){
+  const changed = await relPickCloudSites();
+  if(!changed) return;
+  try{
+    const html = getReleaseNoteHTML();
+    if(popupWin && !popupWin.closed){
+      const wrap = popupWin.document.querySelector('.print-section');   // 출고증 섹션 컨테이너(단일 출력 가정)
+      // 출고증만 단독 출력일 때: 첫 print-section 교체. 여러 섹션이면 마지막(출고증) 교체
+      const secs = popupWin.document.querySelectorAll('.print-section');
+      const target = secs[secs.length-1] || wrap;
+      if(target) target.innerHTML = html;
+    }
+  }catch(e){ console.error(e); }
+}
+
 function getReleaseNoteHTML(){
   const td = _relToday();
   const t = { y:td.y, m:td.m, d:td.d, next:_relNextDay() };
@@ -11527,22 +11603,18 @@ function getReleaseNoteHTML(){
     .rn-scissor{text-align:center;color:#888;font-size:12px;letter-spacing:2px;margin:2px 0}
     .rn-sitebar{background:#eef6f4;border:1.5px solid #0d7a6f;border-radius:7px;padding:8px 12px;margin:0 0 10px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .rn-chip{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #bcd;border-radius:14px;padding:3px 10px;cursor:pointer;font-weight:600}
+    .rn-addbtn{background:#0d7a6f;color:#fff;border:none;padding:4px 12px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer}
     .rn-hint{color:#666;font-size:11px;margin-left:auto}
     @media print{ .rn-part{page-break-inside:avoid} }
   </style>`;
   const sites = _relSiteList();
   // 현장 선택 바 (현장 2곳 이상일 때만) — 체크한 현장만 출고증에 표시
-  let siteBar = '';
-  if(sites.length >= 1){
-    const chips = sites.map(sv=>`<label class="rn-chip"><input type="checkbox" class="rn-sitechk" value="${_relEsc(sv)}" checked> ${_relEsc(sv)}</label>`).join('');
-    const hint = sites.length > 1
-      ? '체크한 현장만 출고증에 포함됩니다 (인쇄 시 이 줄은 안 나옴)'
-      : '현장 1곳 — 여러 현장을 함께 출고하려면 클라우드에서 현장을 더 불러오세요 (인쇄 시 이 줄은 안 나옴)';
-    siteBar = `<div class="rn-sitebar no-print">
-      <b>출고 현장 선택 (${sites.length}):</b> ${chips}
-      <span class="rn-hint">${hint}</span>
+  const chips = sites.map(sv=>`<label class="rn-chip"><input type="checkbox" class="rn-sitechk" value="${_relEsc(sv)}" checked> ${_relEsc(sv)}</label>`).join('');
+  const siteBar = `<div class="rn-sitebar no-print">
+      <b>출고 현장 (${sites.length}):</b> ${chips}
+      <button class="rn-addbtn" onclick="(window.opener&&window.opener.relAddCloudAndRefresh)?window.opener.relAddCloudAndRefresh(window):alert('부모 창을 찾을 수 없습니다.')">➕ 클라우드 현장 추가</button>
+      <span class="rn-hint">체크 해제하면 그 현장은 빠집니다 · 이 줄은 인쇄 시 안 나옴</span>
     </div>`;
-  }
   const syncScript = `<script>(function(){
     // ① 인수자용 ↔ 보관용 입력 동기화
     function sync(e){
