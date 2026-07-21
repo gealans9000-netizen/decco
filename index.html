@@ -11456,10 +11456,10 @@ function _relOnePart(partLabel, t){
     const siteAttr = r && r.site ? ` data-rnsite="${_relEsc(r.site)}"` : '';
     bodyRows += `<tr class="rn-itemrow"${siteAttr}>
       <td class="rn-c rn-no" style="width:34px">${i+1}</td>
-      <td class="rn-l">${r?_relCell(r.name,'item-name-'+i):'&nbsp;'}</td>
-      <td class="rn-c" style="width:150px">${r?_relCell(r.spec,'item-spec-'+i):'&nbsp;'}</td>
-      <td class="rn-c" style="width:70px">${r?_relCell(r.qty,'item-qty-'+i):'&nbsp;'}</td>
-      <td class="rn-l" style="width:90px">${r?_relCell(r.note,'item-note-'+i):'&nbsp;'}</td>
+      <td class="rn-l">${_relCell(r?r.name:'','item-name-'+i)}</td>
+      <td class="rn-c" style="width:150px">${_relCell(r?r.spec:'','item-spec-'+i)}</td>
+      <td class="rn-c" style="width:70px">${_relCell(r?r.qty:'','item-qty-'+i)}</td>
+      <td class="rn-l" style="width:90px">${_relCell(r?r.note:'','item-note-'+i)}</td>
     </tr>`;
   }
   return `
