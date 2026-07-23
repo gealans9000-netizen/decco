@@ -1640,6 +1640,9 @@ let editingOrderId = null; // 수정 중인 견적 항목 id (null이면 일반 
 const adjRates = { profile: 0, reinf: 0, glass: 0, gb: 0, coupl: 0, rail: 0, screen: 0, addon: 0, nail: 0, wind: 0, expBand: 0, angle90: 0, flashing: 0, taping: 0, labor: 0 };
 const ADJ_KEYS = ['profile','reinf','glass','gb','coupl','rail','screen','addon','nail','wind','angle90','flashing','taping','labor'];
 const adjExclude = { profile:false, reinf:false, glass:false, gb:false, coupl:false, rail:false, screen:false, addon:false, nail:false, wind:false, expBand:false, angle90:false, flashing:false, taping:false, labor:false };
+// 사용자가 ✕ 버튼으로 직접 지정한 항목 — 자동 동기화가 건드리지 않는다
+// (유리/방충망만 자동 동기화 대상이므로 두 키만 관리)
+const _adjExclManual = { glass:false, screen:false };
 
 // ── 수동 금액 조정 상태 ──
 let manualAdjs = []; // [{id, label, amount}]
@@ -2711,17 +2714,22 @@ function autoSyncAdjExclude(){
   });
   
   console.log('[autoSync] allGlassNone=', allGlassNone, 'allScreenNone=', allScreenNone,
-              'adjExclude.glass=', adjExclude.glass, 'adjExclude.screen=', adjExclude.screen);
-  
-  // 유리: 현재 상태와 목표 상태가 다르면 토글
-  if(adjExclude.glass !== allGlassNone){
+              'adjExclude.glass=', adjExclude.glass, 'adjExclude.screen=', adjExclude.screen,
+              'manual=', JSON.stringify(_adjExclManual));
+
+  // 유리: 사용자가 직접 지정한 항목은 건드리지 않는다 (원가검토/견적서 출력 시 되돌아가는 문제 방지)
+  if(_adjExclManual.glass){
+    console.log('[autoSync] 유리 — 사용자 수동 지정이므로 유지');
+  } else if(adjExclude.glass !== allGlassNone){
     console.log('[autoSync] 유리 toggle 호출');
-    toggleExclude('glass');
+    toggleExclude('glass', true);
   }
   // 방충망: 동일
-  if(adjExclude.screen !== allScreenNone){
+  if(_adjExclManual.screen){
+    console.log('[autoSync] 방충망 — 사용자 수동 지정이므로 유지');
+  } else if(adjExclude.screen !== allScreenNone){
     console.log('[autoSync] 방충망 toggle 호출');
-    toggleExclude('screen');
+    toggleExclude('screen', true);
   }
 }
 
@@ -16907,7 +16915,9 @@ function syncAdjAll(val){
   updateAdj();
 }
 
-function toggleExclude(key){
+function toggleExclude(key, bySync){
+  // 사용자가 직접 누른 경우 → 이후 자동 동기화가 이 항목을 되돌리지 않도록 표시
+  if(!bySync && Object.prototype.hasOwnProperty.call(_adjExclManual, key)) _adjExclManual[key] = true;
   adjExclude[key] = !adjExclude[key];
   const btn  = document.getElementById('adj-'+key+'-excl');
   const pct  = document.getElementById('adj-'+key+'-pct');
@@ -16924,6 +16934,8 @@ function toggleExclude(key){
 
 function resetAllAdj(){
   ADJ_KEYS.forEach(k=>{ adjRates[k]=0; adjExclude[k]=false; });
+  // 수동 지정 표시도 해제 → 다시 자동 동기화 대상으로 되돌림
+  Object.keys(_adjExclManual).forEach(k=>{ _adjExclManual[k]=false; });
   [...ADJ_KEYS,'all'].forEach(k=>{
     const s=document.getElementById('adj-'+k+'-slider');
     const p=document.getElementById('adj-'+k+'-pct');
