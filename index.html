@@ -2047,6 +2047,33 @@ const GLASS={
   G5:{thk:47,glassMM:15,combo:'로이+투명+로이', label:'47T 투명 일강',     spec:'47T 5dura MAX+16Ar(SWS)+5CL H/S+16Ar(SWS)+5dura MAX'},
   G6:{thk:47,glassMM:15,opaque:true,combo:'로이+미스트+로이',label:'47T 불투명 일강',   spec:'47T 5dura MAX+16Ar(SWS)+5ML(HS)+16Ar(SWS)+5dura MAX'},
 };
+// 유리 코드(G1~G6) → 유리색상 라벨 (일람표 '유리색상' 표기용)
+// 브론즈/불투명 등 특수 유리는 그대로, 그 외는 '투명'
+function glassColorLabel(code){
+  const lb = (GLASS[code] && GLASS[code].label) || '';
+  if(/브론즈/.test(lb)) return '브론즈';
+  if(/불투명|미스트/.test(lb)) return '불투명';
+  return '투명';
+}
+// 항목들의 OPEN/FIX 유리를 종합해 유리색상 표기 (여러 색이면 함께 표시)
+function scheduleGlassColorText(items){
+  const set = new Set();
+  (items||[]).forEach(it=>{
+    if(it && it.cancelled) return;
+    const s = (it && it.snapshot) || {};
+    const gOpen = s.glassType || document.getElementById('glassType')?.value || 'G5';
+    let gFix = s.glassTypeFix || document.getElementById('glassTypeFix')?.value || 'same';
+    if(gFix === 'same' || !gFix) gFix = gOpen;
+    set.add(glassColorLabel(gOpen));
+    set.add(glassColorLabel(gFix));
+  });
+  if(!set.size) return '투명';
+  // '투명'만 있으면 투명, 특수색이 있으면 특수색 우선 나열
+  const arr = Array.from(set);
+  const special = arr.filter(v=>v!=='투명');
+  return special.length ? special.concat(arr.includes('투명')?['투명']:[]).join(' / ') : '투명';
+}
+
 // 유리 무게 계산: glassMM × 가로(m) × 세로(m) × 2.5
 function glassWeightKg(glassWmm, glassHmm, glassMM){
   return glassMM * (glassWmm/1000) * (glassHmm/1000) * 2.5;
@@ -3585,7 +3612,15 @@ function refreshTable(){
     tb.innerHTML = '<tr><td colspan="21" style="text-align:center;padding:30px;color:#999">창호 목록이 비어있습니다.</td></tr>';
     return;
   }
-  tb.innerHTML = items.map((item,idx)=>buildRow(item,idx)).join('');
+  // 행 단위로 오류를 격리 — 한 행에서 예외가 나도 나머지 표는 정상 표시
+  tb.innerHTML = items.map((item,idx)=>{
+    try{ return buildRow(item,idx); }
+    catch(e){
+      console.error('[일괄편집] 행 렌더 실패 idx=',idx,item,e);
+      return '<tr style="background:#fff0f0"><td colspan="21" style="padding:8px;color:#c00;font-size:11px">⚠ '
+        + ((item && item.mark) || ('창호 '+(idx+1))) + ' 행을 표시할 수 없습니다 ('+ (e && e.message ? e.message : '오류') +')</td></tr>';
+    }
+  }).join('');
 }
 
 // 초기화
@@ -4896,7 +4931,10 @@ function drawWindow(W,H,g){
   const blk=isBlack();
   // 견적서용 덧바 색상 단순화 옵션 (덧바를 외부 프레임과 동일하게 = 시각적으로 안 보이게)
   // window._hideAddonForExport 가 true이고 + window._renderingForExport 출력 중일 때만 적용
-  const hideAddonColor = !!(window._hideAddonForExport && window._renderingForExport);
+  // ※ 'T/S 덧바 숨김'은 T/S 타입에만 적용 — 다른 타입은 좌측 치수/덧바가 그대로 보여야 함
+  const _isTSForHide = (baseType==='TS' || baseType==='TSTS'
+                        || (Array.isArray(g.cells) && g.cells.some(c=>c && c.ct==='TS')));
+  const hideAddonColor = !!(window._hideAddonForExport && window._renderingForExport && _isTSForHide);
   // 색상 팔레트 — 블랙 모드: 외곽프레임 회색/검정, 샤시·유리는 화이트와 동일
   const FRAME_FILL = blk?'#888888':'#c8d8f0';   // 블랙: 회색 / 화이트: 연파랑
   const FRAME_STK  = blk?'#111111':'#4466cc';   // 블랙: 검정 / 화이트: 파랑
@@ -5366,8 +5404,9 @@ function drawWindow(W,H,g){
   out+=dimLineV(px(W) + DIM_STEP*0.2, py(0), py(H), `${H} mm`, '#d92e2e', 6);
 
   // (D) 덧바 좌측 세로 치수 표시
-  // 견적서/일람표 출력 시점 + 전역 플래그 ON이면 좌측 치수 모두 숨김
-  const hideLeftDim = !!(window._hideAddonForExport && window._renderingForExport);
+  // 견적서/일람표 출력 시점 + 전역 플래그 ON + T/S 타입일 때만 좌측 치수 숨김
+  // (T/S가 아닌 타입은 좌측 치수가 그대로 보여야 함 — 사이즈 확인용)
+  const hideLeftDim = !!(window._hideAddonForExport && window._renderingForExport && _isTSForHide);
   // 좌측 세로 치수 색상 — 모두 검정으로 통일 (사용자 요청: 색상 통일)
   // ※ T/S 덧바 숨김 토글이 색상으로 좌측 치수 식별 → 검사 목록에 #111111 추가됨
   const LEFT_DIM_COL = '#111111';
@@ -8866,6 +8905,7 @@ function clearOrder(){
   cancelEditOrder();
   orderItems = [];
   _setScheduleBlankList([]);
+  _setSchedMeta(null);   // 새 프로젝트 → 일람표 수동입력 초기화
   selectedItemIds.clear();
   // ★ 새 프로젝트 시작으로 간주 — 클라우드 ID 끊기 (다음 ☁️ 저장은 새 프로젝트로)
   if(typeof _currentCloudProjectId !== 'undefined') _currentCloudProjectId = null;
@@ -10135,7 +10175,7 @@ function buildGBListHTML(){
   const site    = orderItems[0]?.site || '';
   const company = orderItems[0]?.company || '';
 
-  // GB 항목 수집 (유리 단위로, 가로/세로 +14mm)
+  // GB 항목 수집 (유리 단위로, 오픈 +12mm / 픽스 +24mm)
   const gbList = [];
   orderItems.forEach((item, idx) => {
     if(item.cancelled) return;  // ★ 취소 항목 제외
@@ -10160,6 +10200,7 @@ function buildGBListHTML(){
           markLoc,
           kind: item.wo.sashs.length > 1 ? `OPEN-${si+1}` : 'OPEN',
           gbType: gbLabel,
+          gbCode: gbType,
           itemIdx: idx, sashIdx: si,
           sortIdx: idx*10000 + si
         });
@@ -10178,6 +10219,7 @@ function buildGBListHTML(){
           markLoc,
           kind: item.wo.fixGlasses.length > 1 ? `FIX-${si+1}` : 'FIX',
           gbType: gbLabel,
+          gbCode: gbType,
           itemIdx: idx, sashIdx: si + 5000,
           sortIdx: idx*10000 + 5000 + si
         });
@@ -10195,6 +10237,20 @@ function buildGBListHTML(){
   // 합계
   const totalQty = gbList.reduce((s,r) => s + r.qty, 0);
   const totalLenM = gbList.reduce((s,r) => s + (2*(r.gbW + r.gbH) * r.qty)/1000, 0);  // 둘레 = 2×(W+H)
+
+  // 6m 바 사용 개수 (종류별 둘레 → 로스율 20% 추가 ÷ 6m, 올림) — 재고 차감과 동일
+  const GB_LOSS = 1.20;
+  let gb47M = 0, gb24M = 0;
+  gbList.forEach(r => {
+    const lenM = (2*(r.gbW + r.gbH) * r.qty)/1000;
+    if(r.gbCode === 'GB47_2')        gb47M += lenM * 2;
+    else if(r.gbCode === 'GB47_24'){ gb47M += lenM; gb24M += lenM; }
+    else                             gb47M += lenM;
+  });
+  const gb47Bars = gb47M > 0 ? Math.ceil(gb47M * GB_LOSS / 6) : 0;
+  const gb24Bars = gb24M > 0 ? Math.ceil(gb24M * GB_LOSS / 6) : 0;
+  const totalBars = gb47Bars + gb24Bars;
+  const barBreak = gb24Bars > 0 ? ` (GB47 ${gb47Bars}본 + GB24 ${gb24Bars}본)` : '';
 
   const rowsHtml = gbList.map((r, i) => {
     const peri = (2*(r.gbW + r.gbH) * r.qty) / 1000;  // 그 행의 누적 둘레 (m)
@@ -10230,14 +10286,14 @@ function buildGBListHTML(){
     <div class="gb-hdr">
       <div>
         <div class="gb-title">📏 데코 GB 절단 리스트</div>
-        <div class="gb-meta">Decco | ${site}${company?` (${company})`:''} | ${today}<br>※ GB 가로 = 유리 가로 + 14mm, GB 세로 = 유리 세로 + 14mm</div>
+        <div class="gb-meta">Decco | ${site}${company?` (${company})`:''} | ${today}<br>※ GB 치수 = 유리 치수 + 오픈 12mm / 픽스 24mm (가로·세로 동일)</div>
       </div>
     </div>
     <div class="gb-summary">
       <div>
-        <div style="font-size:11px;opacity:.9">📦 총 GB 개수 / 누적 둘레</div>
+        <div style="font-size:11px;opacity:.9">📦 GB 바(6m) 사용 개수 / 누적 둘레</div>
       </div>
-      <div class="gb-summary-val">${totalQty}개 / ${totalLenM.toFixed(3)}m</div>
+      <div class="gb-summary-val">${totalBars}본${barBreak} / ${totalLenM.toFixed(3)}m</div>
     </div>
     <table class="gb-table">
       <thead>
@@ -10274,7 +10330,7 @@ function batchExcel(){
   const chkLabel = document.getElementById('chk-label-only')?.checked;
   const chkQuote    = document.getElementById('chk-quote')?.checked;
   const chkQuoteSvg = document.getElementById('chk-quotesvg')?.checked;
-  if(!chkSched && !chkWork && !chkCut && !chkGlass && !chkScreen && !chkFrameInner && !chkGB && !chkLabel){alert('저장할 항목을 1개 이상 선택하세요.');return}
+  if(!chkSched && !chkWork && !chkCut && !chkGlass && !chkScreen && !chkFrameInner && !chkGB && !chkLabel && !chkQuote && !chkQuoteSvg){alert('저장할 항목을 1개 이상 선택하세요.');return}
 
   const data = buildCutData();
   const today = new Date().toLocaleDateString('ko-KR');
@@ -10680,7 +10736,7 @@ function batchExcel(){
 
   // ── 📏 GB 절단 리스트 시트 ──
   // 컬럼: 창호번호 / 가로(mm) / 세로(mm) / 수량 / 부호(위치) / 구분 / GB 종류
-  // GB 가로 = 유리 가로 + 14mm, GB 세로 = 유리 세로 + 14mm
+  // GB 치수 = 유리 치수 + 오픈 12mm / 픽스 24mm (가로·세로 동일)
   let gbTotalQty = 0;  // GB 개수 (외부 스코프 — 파일명용)
   if(chkGB){
     sheets += `<tr><td colspan="7" style="color:#1a4488;font-weight:700;font-size:15px;padding:7px;text-align:center">GB 절단 리스트 (유리 가로/세로 + 14mm)</td></tr>`;
@@ -11028,6 +11084,9 @@ function commitEditOrder(){
     }
     // 커스텀 이미지 스냅샷
     if(canvasCustomImgData) woData.customImgData = canvasCustomImgData;
+    // ★ 업로드 도면 라벨(이형/지붕창 등) 보존
+    const _prevLabel = orderItems[idx] && orderItems[idx].wo && orderItems[idx].wo.customImgLabel;
+    if(_prevLabel) woData.customImgLabel = _prevLabel;
   })();
   const snapshot=Object.assign(getCurrentSettings(),{
     qty,
@@ -12519,40 +12578,40 @@ function printQuote(){
           ${manualRows}
           ${(() => {
             const _items = Array.isArray(items) ? items : [];
-            // 유리금액 합계
-            const glassTotal = _items.reduce((s,i)=>s+(i.glassCost||0)*(i.qty||1),0);
-            // 창호 자재비 합계 (유리 제외)
-            const frameTotal = totals.grand - (adjExclude.glass ? 0 : glassTotal);
-            // 각 행의 금액들
+            // 각 구성 금액
+            const glassTotal   = _items.reduce((s,i)=>s+(i.glassCost||0)*(i.qty||1),0);
+            const glassShown   = adjExclude.glass ? 0 : Math.round(glassTotal);
+            const screenVal    = adjExclude.screen ? 0 : Math.round(_items.reduce((s,i)=>s+(i.screenCost||0)*(i.qty||1),0));
+            const tapingVal    = adjExclude.taping ? 0 : Math.round(_items.reduce((s,i)=>s+(i.tapingCost||0)*(i.qty||1),0));
             const transportVal = parseFloat(document.getElementById('fixed-transport')?.value)||0;
-            const laborVal = parseFloat(document.getElementById('fixed-labor')?.value)||0;
-            const tapeVal = 0; /* 단열테이프 항목 제거됨 */
-            const tapingVal = adjExclude.taping ? 0 : Math.round(_items.reduce((s,i)=>s+(i.tapingCost||0)*(i.qty||1),0));
-            const screenVal = adjExclude.screen ? 0 : Math.round(_items.reduce((s,i)=>s+(i.screenCost||0)*(i.qty||1),0));
-            const tapingLabel = ({none:'없음',in:'내부',out:'외부',both:'내부+외부'})[document.getElementById('tapingSel')?.value]||'-';
-            
-            // 자재비 합계 행 (유리 제외)
-            let html = '<tr class="total-row"><td colspan="4">창호 자재비 합계 (유리 제외)</td><td>'+totals.cnt+'</td><td></td><td style="text-align:right">'+fmt(frameTotal)+'</td><td></td></tr>';
-            
-            // 0이 아닌 항목만 행으로 표시 — 본인 요청 순서: 운반비 → 시공비 → 단열테이프 → 기밀테이프 → 유리금액 → 방충망
-            if(transportVal > 0){
-              html += '<tr><td colspan="2" style="text-align:left">운반비</td><td colspan="5" style="text-align:left;font-size:9px">프레임+유리 왕복</td><td style="text-align:right">'+transportVal.toLocaleString('ko-KR')+'</td></tr>';
+            const laborVal     = parseFloat(document.getElementById('fixed-labor')?.value)||0;
+            const tapingLabel  = ({none:'없음',in:'내부',out:'외부',both:'내부+외부'})[document.getElementById('tapingSel')?.value]||'-';
+            // 공급가 합계 = 공급가 열의 합 (= 총 grand − 수동/고정 조정)
+            const colSum = Math.round(totals.grand - manualTotal);
+            // 창호 자재비 = 공급가 합계 − 유리 − 방충망 − 기밀 (나머지)
+            const windowMaterial = colSum - glassShown - screenVal - tapingVal;
+
+            let html = '';
+            // ── 공급가 세부내역 (아래 항목의 합 = 공급가 합계) ──
+            html += '<tr><td colspan="8" style="text-align:left;background:#eef3fb;font-size:9px;color:#5a6b8a;font-weight:700;padding:2px 6px">▸ 공급가 세부내역 (아래 항목의 합 = 공급가 합계)</td></tr>';
+            html += '<tr><td colspan="2" style="text-align:left">창호 자재비</td><td colspan="5" style="text-align:left;font-size:9px">프레임·샤시·중간바 등 (유리·방충망·기밀 제외)</td><td style="text-align:right">'+windowMaterial.toLocaleString('ko-KR')+'</td></tr>';
+            if(glassShown > 0){
+              html += '<tr><td colspan="2" style="text-align:left;background:#f5faff">유리금액</td><td colspan="5" style="text-align:left;font-size:9px;background:#f5faff">유리 자재비</td><td style="text-align:right;background:#f5faff">'+glassShown.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(laborVal > 0){
-              html += '<tr><td colspan="2" style="text-align:left">시공비</td><td colspan="5" style="text-align:left;font-size:9px">시공비(프레임+유리+방충망+유리조정+장비대)</td><td style="text-align:right">'+laborVal.toLocaleString('ko-KR')+'</td></tr>';
+            if(screenVal > 0){
+              html += '<tr><td colspan="2" style="text-align:left">방충망</td><td colspan="5" style="text-align:left;font-size:9px">방충망 &lt;상하/좌우 개폐방식(외부 부착용)&gt;</td><td style="text-align:right">'+screenVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(tapeVal > 0){
-              html += '<tr><td colspan="2" style="text-align:left">단열테이프</td><td colspan="5" style="text-align:left;font-size:9px">단열, 기밀 시공 부자재</td><td style="text-align:right">'+tapeVal.toLocaleString('ko-KR')+'</td></tr>';
-            }
-            if(!adjExclude.taping && tapingVal > 0){
+            if(tapingVal > 0){
               html += '<tr><td colspan="2" style="text-align:left">기밀테이프</td><td colspan="5" style="text-align:left;font-size:9px">기밀테이프('+tapingLabel+')</td><td style="text-align:right">'+tapingVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            // 유리금액 행 (별도 표기)
-            if(!adjExclude.glass && glassTotal > 0){
-              html += '<tr><td colspan="2" style="text-align:left;background:#f5faff;font-weight:700">유리금액</td><td colspan="5" style="text-align:left;font-size:9px;background:#f5faff">유리 자재비 별도 합계</td><td style="text-align:right;background:#f5faff;font-weight:700">'+Math.round(glassTotal).toLocaleString('ko-KR')+'</td></tr>';
+            // ── 공급가 합계 (위 항목의 합 = 공급가 열 합) ──
+            html += '<tr class="total-row"><td colspan="4" style="font-weight:700">공급가 합계</td><td>'+totals.cnt+'</td><td></td><td style="text-align:right;font-weight:700">'+colSum.toLocaleString('ko-KR')+'</td><td></td></tr>';
+            // ── 추가 비용 (운반비/시공비) — 있을 때만, 공급가 합계에 더해 총 금액이 됨 ──
+            if(transportVal > 0){
+              html += '<tr><td colspan="2" style="text-align:left">＋ 운반비</td><td colspan="5" style="text-align:left;font-size:9px">프레임+유리 왕복</td><td style="text-align:right">'+transportVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(!adjExclude.screen && screenVal > 0){
-              html += '<tr><td colspan="2" style="text-align:left">방충망</td><td colspan="5" style="text-align:left;font-size:9px">방충망 &lt;상하/좌우 개폐방식(외부 부착용)&gt;</td><td style="text-align:right">'+screenVal.toLocaleString('ko-KR')+'</td></tr>';
+            if(laborVal > 0){
+              html += '<tr><td colspan="2" style="text-align:left">＋ 시공비</td><td colspan="5" style="text-align:left;font-size:9px">시공비(프레임+유리+방충망+유리조정+장비대)</td><td style="text-align:right">'+laborVal.toLocaleString('ko-KR')+'</td></tr>';
             }
             return html;
           })()}
@@ -12736,8 +12795,11 @@ function printQuoteWithSVG(){
   }
 
   // SVG 스냅샷 → 인쇄용 밝게 변환
-  function cleanSvg(wo){
+  function cleanSvg(wo, baseType){
     if(!wo?.svgSnapshot||!wo?.svgViewBox) return null;
+    // 'T/S 덧바 숨김'은 T/S 타입에만 적용 (단창 TS·양개 TSTS·T/S 셀 포함)
+    const _isTSForHide = (baseType==='TS' || baseType==='TSTS'
+                          || (Array.isArray(wo.cells) && wo.cells.some(c=>c && c.ct==='TS')));
     let snap = wo.svgSnapshot
       .replace(/fill="#0d1018"/g,'fill="white"').replace(/fill="#141824"/g,'fill="white"')
       .replace(/fill="#1a2030"/g,'fill="white"').replace(/fill="#1f2638"/g,'fill="white"')
@@ -12751,8 +12813,9 @@ function printQuoteWithSVG(){
       .replace(/stroke="#3a4a6a"/g,'stroke="#a01818"')
       .replace(/(\d+) mm/g,'$1');
     
-    // T/S 덧바 숨김 옵션 ON → 덧바 색상을 외부 프레임 색과 동일하게 + 좌측 치수만 제거
-    if(window._hideAddonForExport){
+    // T/S 덧바 숨김 옵션 ON + T/S 타입일 때만 → 덧바 색상 단순화 + 좌측 치수 제거
+    // (T/S가 아닌 타입은 좌측 치수가 그대로 보여야 함 — 사이즈 확인용)
+    if(window._hideAddonForExport && _isTSForHide){
       snap = snap
         .replace(/fill="#e03030"/g,   'fill="#c8d8f0"')
         .replace(/fill="#cc2222"/g,   'fill="#888888"')
@@ -12789,7 +12852,7 @@ function printQuoteWithSVG(){
       const unit=it.qty>0?Math.round(adj/it.qty):0;
       // 이형 창호: 업로드 이미지 우선 사용
       const isIrr = !!(it.wo && it.wo.customImgData);
-      const svg = isIrr ? null : cleanSvg(it.wo);
+      const svg = isIrr ? null : cleanSvg(it.wo, it.baseType);
       let svgCell;
       if(isIrr){
         svgCell = `<td style="width:90px;padding:2px;background:#fff4e6;text-align:center;vertical-align:middle;position:relative">
@@ -12990,34 +13053,40 @@ function printQuoteWithSVG(){
           ${manualRows}
           ${(() => {
             const _items = Array.isArray(items) ? items : [];
-            const glassTotal = _items.reduce((s,i)=>s+(i.glassCost||0)*(i.qty||1),0);
-            const frameTotal = totals.grand - (adjExclude.glass ? 0 : glassTotal);
+            // 각 구성 금액
+            const glassTotal   = _items.reduce((s,i)=>s+(i.glassCost||0)*(i.qty||1),0);
+            const glassShown   = adjExclude.glass ? 0 : Math.round(glassTotal);
+            const screenVal    = adjExclude.screen ? 0 : Math.round(_items.reduce((s,i)=>s+(i.screenCost||0)*(i.qty||1),0));
+            const tapingVal    = adjExclude.taping ? 0 : Math.round(_items.reduce((s,i)=>s+(i.tapingCost||0)*(i.qty||1),0));
             const transportVal = parseFloat(document.getElementById('fixed-transport')?.value)||0;
-            const laborVal = parseFloat(document.getElementById('fixed-labor')?.value)||0;
-            const tapeVal = 0; /* 단열테이프 항목 제거됨 */
-            const tapingVal = adjExclude.taping ? 0 : Math.round(_items.reduce((s,i)=>s+(i.tapingCost||0)*(i.qty||1),0));
-            const screenVal = adjExclude.screen ? 0 : Math.round(_items.reduce((s,i)=>s+(i.screenCost||0)*(i.qty||1),0));
-            const tapingLabel = ({none:'없음',in:'내부',out:'외부',both:'내부+외부'})[document.getElementById('tapingSel')?.value]||'-';
-            
-            let html = '<tr class="total-row"><td></td><td colspan="4">창호 자재비 합계 (유리 제외)</td><td>'+totals.cnt+'</td><td></td><td style="text-align:right">'+fmt(frameTotal)+'</td><td></td></tr>';
-            
-            if(transportVal > 0){
-              html += '<tr><td></td><td colspan="2" style="text-align:left">운반비</td><td colspan="5" style="text-align:left;font-size:9px">프레임+유리 왕복</td><td style="text-align:right">'+transportVal.toLocaleString('ko-KR')+'</td></tr>';
+            const laborVal     = parseFloat(document.getElementById('fixed-labor')?.value)||0;
+            const tapingLabel  = ({none:'없음',in:'내부',out:'외부',both:'내부+외부'})[document.getElementById('tapingSel')?.value]||'-';
+            // 공급가 합계 = 공급가 열의 합 (= 총 grand − 수동/고정 조정)
+            const colSum = Math.round(totals.grand - manualTotal);
+            // 창호 자재비 = 공급가 합계 − 유리 − 방충망 − 기밀 (나머지)
+            const windowMaterial = colSum - glassShown - screenVal - tapingVal;
+
+            let html = '';
+            // ── 공급가 세부내역 (아래 항목의 합 = 공급가 합계) ──
+            html += '<tr><td></td><td colspan="8" style="text-align:left;background:#eef3fb;font-size:9px;color:#5a6b8a;font-weight:700;padding:2px 6px">▸ 공급가 세부내역 (아래 항목의 합 = 공급가 합계)</td></tr>';
+            html += '<tr><td></td><td colspan="2" style="text-align:left">창호 자재비</td><td colspan="5" style="text-align:left;font-size:9px">프레임·샤시·중간바 등 (유리·방충망·기밀 제외)</td><td style="text-align:right">'+windowMaterial.toLocaleString('ko-KR')+'</td></tr>';
+            if(glassShown > 0){
+              html += '<tr><td></td><td colspan="2" style="text-align:left;background:#f5faff">유리금액</td><td colspan="5" style="text-align:left;font-size:9px;background:#f5faff">유리 자재비</td><td style="text-align:right;background:#f5faff">'+glassShown.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(laborVal > 0){
-              html += '<tr><td></td><td colspan="2" style="text-align:left">시공비</td><td colspan="5" style="text-align:left;font-size:9px">시공비(프레임+유리+방충망+유리조정+장비대)</td><td style="text-align:right">'+laborVal.toLocaleString('ko-KR')+'</td></tr>';
+            if(screenVal > 0){
+              html += '<tr><td></td><td colspan="2" style="text-align:left">방충망</td><td colspan="5" style="text-align:left;font-size:9px">방충망 &lt;상하/좌우 개폐방식(외부 부착용)&gt;</td><td style="text-align:right">'+screenVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(tapeVal > 0){
-              html += '<tr><td></td><td colspan="2" style="text-align:left">단열테이프</td><td colspan="5" style="text-align:left;font-size:9px">단열, 기밀 시공 부자재</td><td style="text-align:right">'+tapeVal.toLocaleString('ko-KR')+'</td></tr>';
-            }
-            if(!adjExclude.taping && tapingVal > 0){
+            if(tapingVal > 0){
               html += '<tr><td></td><td colspan="2" style="text-align:left">기밀테이프</td><td colspan="5" style="text-align:left;font-size:9px">기밀테이프('+tapingLabel+')</td><td style="text-align:right">'+tapingVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(!adjExclude.glass && glassTotal > 0){
-              html += '<tr><td></td><td colspan="2" style="text-align:left;background:#f5faff;font-weight:700">유리금액</td><td colspan="5" style="text-align:left;font-size:9px;background:#f5faff">유리 자재비 별도 합계</td><td style="text-align:right;background:#f5faff;font-weight:700">'+Math.round(glassTotal).toLocaleString('ko-KR')+'</td></tr>';
+            // ── 공급가 합계 (위 항목의 합 = 공급가 열 합) ──
+            html += '<tr class="total-row"><td></td><td colspan="4" style="font-weight:700">공급가 합계</td><td>'+totals.cnt+'</td><td></td><td style="text-align:right;font-weight:700">'+colSum.toLocaleString('ko-KR')+'</td><td></td></tr>';
+            // ── 추가 비용 (운반비/시공비) — 있을 때만, 공급가 합계에 더해 총 금액이 됨 ──
+            if(transportVal > 0){
+              html += '<tr><td></td><td colspan="2" style="text-align:left">＋ 운반비</td><td colspan="5" style="text-align:left;font-size:9px">프레임+유리 왕복</td><td style="text-align:right">'+transportVal.toLocaleString('ko-KR')+'</td></tr>';
             }
-            if(!adjExclude.screen && screenVal > 0){
-              html += '<tr><td></td><td colspan="2" style="text-align:left">방충망</td><td colspan="5" style="text-align:left;font-size:9px">방충망 &lt;상하/좌우 개폐방식(외부 부착용)&gt;</td><td style="text-align:right">'+screenVal.toLocaleString('ko-KR')+'</td></tr>';
+            if(laborVal > 0){
+              html += '<tr><td></td><td colspan="2" style="text-align:left">＋ 시공비</td><td colspan="5" style="text-align:left;font-size:9px">시공비(프레임+유리+방충망+유리조정+장비대)</td><td style="text-align:right">'+laborVal.toLocaleString('ko-KR')+'</td></tr>';
             }
             return html;
           })()}
@@ -14521,6 +14590,51 @@ function _getScheduleTitle(){
   try{ return Object.assign({}, DEFAULT_SCHEDULE_TITLE, JSON.parse(localStorage.getItem('decco_schedule_title')||'{}')); }
   catch(_){ return Object.assign({}, DEFAULT_SCHEDULE_TITLE); }
 }
+// ── 일람표 우측 상단(모델/수량·TYPE/프레임색상/피스홀·테이핑/유리색상) — 수동 입력(오버라이드) ──
+// 비워두면 자동 계산값 사용. 현장(프로젝트)별로 저장됨.
+let _schedInfo = null;   // 현장별 우측상단 오버라이드 (null이면 자동값)
+function _getSchedInfo(){ return _schedInfo || {}; }
+// 팝업에서 호출 → 저장 후 갱신된 일람표 HTML 반환
+// ※ 입력값이 현재 자동값과 같으면 오버라이드로 저장하지 않음 (설정 변경 시 자동값을 계속 따라감)
+function editScheduleInfo(model, qtyType, frameColor, piecehole, glassColor){
+  const auto = (window.__schedInfoAuto) || {};
+  const pick = (v, a) => {
+    const s = String(v==null?'':v).trim();
+    if(!s) return '';
+    if(a != null && s === String(a).trim()) return '';
+    return s;
+  };
+  const o = {
+    model:      pick(model,      auto.model),
+    qtyType:    pick(qtyType,    auto.qtyType),
+    frameColor: pick(frameColor, auto.frameColor),
+    piecehole:  pick(piecehole,  auto.piecehole),
+    glassColor: pick(glassColor, auto.glassColor)
+  };
+  const empty = !o.model && !o.qtyType && !o.frameColor && !o.piecehole && !o.glassColor;
+  _schedInfo = empty ? null : o;
+  try{ if(typeof markDirty==='function') markDirty(); }catch(_){}
+  try{ if(typeof autosave==='function') autosave(); }catch(_){}
+  return printWindowSchedule({returnHtml:true});
+}
+function resetScheduleInfo(){
+  _schedInfo = null;
+  try{ if(typeof markDirty==='function') markDirty(); }catch(_){}
+  try{ if(typeof autosave==='function') autosave(); }catch(_){}
+  return printWindowSchedule({returnHtml:true});
+}
+// 프로젝트 저장/복원용 (data에 함께 직렬화)
+// ※ 일람표 중앙 제목은 데코 기존 방식(localStorage 전역)을 그대로 사용하므로 여기 포함하지 않음
+function _getSchedMeta(){
+  const m = {};
+  if(_schedInfo) m.info = _schedInfo;
+  return m;
+}
+function _setSchedMeta(m){
+  m = m || {};
+  _schedInfo = m.info || null;
+}
+
 async function printWindowSchedule(opts){
   const _inPlace = !!(opts && opts.inPlace);   // 공란 토글/삭제 등 제자리 갱신 여부
   if(!orderItems.length){alert('견적 목록이 없습니다. 먼저 창호를 추가하세요.');return}
@@ -14592,6 +14706,17 @@ async function printWindowSchedule(opts){
   // 기존 변수명 호환 (다른 곳에서 사용 가능)
   const tapingVal = tapingLabel;
 
+  // ── 우측 상단 정보: 자동값 + 수동 오버라이드(_si) ──
+  const _si = _getSchedInfo();
+  const _siAuto = {
+    model:      'Decco',
+    qtyType:    `${totalQty} set / TYPE : ${buildType||'RC'}`,
+    frameColor: `외부 : ${colorOut} / 내부 : ${colorIn}`,
+    piecehole:  `${pieceholeVal} / ${tapingLabel}`,
+    glassColor: scheduleGlassColorText(orderItems)
+  };
+  window.__schedInfoAuto = _siAuto;   // editScheduleInfo에서 자동값 비교에 사용
+
   // 타입 레이블 매핑
   const TYPE_LABEL = {
     FIX:   'FIX(고정창)',
@@ -14640,8 +14765,11 @@ async function printWindowSchedule(opts){
       // 치수 텍스트에서 " mm" 제거 → 공간 확보 (숫자만 표시)
       .replace(/(\d+) mm/g, '$1');
     
-    // T/S 덧바 숨김 옵션 ON → 덧바 색상을 외부 프레임 색과 동일하게 + 좌측 치수만 제거
-    if(window._hideAddonForExport){
+    // T/S 덧바 숨김 옵션 ON + T/S 타입일 때만 → 덧바 색상 단순화 + 좌측 치수 제거
+    // (T/S가 아닌 타입은 좌측 치수가 그대로 보여야 함 — 사이즈 확인용)
+    const _isTSForHide = (item.baseType==='TS' || item.baseType==='TSTS'
+                          || (Array.isArray(item.wo.cells) && item.wo.cells.some(c=>c && c.ct==='TS')));
+    if(window._hideAddonForExport && _isTSForHide){
       // 덧바 빨강 → 외부 프레임 색 (화이트 모드: #c8d8f0, 블랙: #888888)
       svgContent = svgContent
         .replace(/fill="#e03030"/g,   'fill="#c8d8f0"')   // 화이트 덧바 fill
@@ -14805,7 +14933,7 @@ async function printWindowSchedule(opts){
         ((i.qty||1)>1 ? '<div style="position:absolute;top:30px;left:6px;min-width:28px;height:20px;padding:0 7px;background:#fff200;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#e00;line-height:1;z-index:10;border:2px solid #d4a500;font-family:Arial,sans-serif;box-sizing:border-box;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.15)" title="수량">×'+i.qty+'</div>' : '')+
         noteBadge+
         joinIndicator+
-        (i.wo && i.wo.customImgData ? '<div class="irr-edit" data-id="'+i.id+'" data-label="'+String(irrLabel(i.wo)).replace(/"/g,'&quot;')+'" title="클릭 → 라벨 수정 (이형/지붕창 등)" style="cursor:pointer;position:absolute;top:5px;right:6px;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:9px;border:1.5px solid #a04000;z-index:10">⚠ '+irrLabel(i.wo)+'</div>' : '')+
+        (i.wo && i.wo.customImgData ? '<div class="irr-edit" data-id="'+i.id+'" data-label="'+String(irrLabel(i.wo)).replace(/"/g,'&quot;')+'" title="클릭 → 라벨 수정 (이형/지붕창 등)" style="cursor:pointer;position:absolute;top:5px;right:6px;background:#e07020;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:9px;border:1.5px solid #a04000;z-index:10">⚠ '+irrLabel(i.wo)+'<span class="no-print" style="margin-left:3px">✎</span></div>' : '')+
         '<div class="svg-wrapper" data-indiv-scale="1" data-window-key="'+(i.mark||'')+'|'+i.W+'x'+i.H+'" style="width:100%;height:100%;overflow:hidden;transform-origin:center center;transition:transform .15s ease-out">'+
         svgEmbed(i)+
         '</div>'+
@@ -14821,7 +14949,8 @@ async function printWindowSchedule(opts){
     const 부호 = group.map(i=>{
       if(!i) return '<td class="sch-blank-edit" contenteditable="true" data-ph="부호 입력" style="border:1px solid #bbb;padding:2px 6px;font-size:12px;font-weight:900;color:#1a4488;text-align:center;line-height:1.2"></td>';
       const cancelledStyle = i.cancelled ? ';color:#999;text-decoration:line-through;font-weight:600' : '';
-      return '<td style="border:1px solid #bbb;padding:2px 6px;font-size:12px;font-weight:900;color:#1a4488;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;background:'+(i.cancelled?'#f0f0f0':'#e8e8ec')+cancelledStyle+'">'+
+      // 부호 칸: 주황 음영 + 진한 갈색 글씨 (부호가 잘 보이도록)
+      return '<td style="border:1px solid #bbb;padding:2px 6px;font-size:12px;font-weight:900;color:'+(i.cancelled?'#999':'#8a3d00')+';line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;background:'+(i.cancelled?'#f0f0f0':'#ffd9a8')+cancelledStyle+'">'+
         (i.mark||'-')+' : '+i.W+' mm × '+i.H+' mm'+
         '</td>';
     }).join('');
@@ -14837,7 +14966,7 @@ async function printWindowSchedule(opts){
       if(i.cancelled){
         return '<td style="border:1px solid #bbb;padding:2px 6px;font-size:10.5px;font-weight:700;color:#cc0000;line-height:1.2;text-align:center;background:#fafafa">❌ 취소됨</td>';
       }
-      return `<td style="border:1px solid #bbb;padding:2px 6px;font-size:10.5px;font-weight:700;color:#1a1a1a;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center">${String(typeLabel(i)||'-')}${i.wo && i.wo.customImgData ? ' <span style="color:#a04000;font-weight:800">(이형)</span>' : ''}</td>`;
+      return `<td style="border:1px solid #bbb;padding:2px 6px;font-size:10.5px;font-weight:700;color:#1a1a1a;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center">${String(typeLabel(i)||'-')}${i.wo && i.wo.customImgData ? ' <span style="color:#a04000;font-weight:800">('+irrLabel(i.wo)+')</span>' : ''}</td>`;
     }).join('');
 
     const 수량 = group.map(i=>{
@@ -14939,9 +15068,12 @@ async function printWindowSchedule(opts){
     const n = Math.min(4, orderItems.length);
     const colW = `style="width:calc((100% - 14px) / 3)"`;
     const colgroup = `<colgroup><col style="width:14px">${Array(3).fill(0).map(()=>`<col ${colW}>`).join('')}</colgroup>`;
-    // 페이지 번호 푸터 (예: "2 페이지 / 4 페이지")
-    const pageFooter = `<div class="page-num-footer" style="position:absolute;left:0;right:0;bottom:0;text-align:center;padding:3px 0;font-size:11px;font-weight:700;color:#555;letter-spacing:0.5px">${pi+1} 페이지 / ${pages.length} 페이지</div>`;
-    return '<div class="page-block' + (pi===0?' pb-first':'') + '" style="position:relative;min-height:' + (pi===0?'225mm':'255mm') + ';padding-bottom:9mm;' + (pi>0?'page-break-before:always':'') + '">'
+    // 페이지 번호 푸터 — 멀티 페이지일 때만 각 블록 하단에 표시
+    // (단일 페이지는 아래 .sched-bottom에서 발주문구와 함께 페이지 맨 아래에 표시)
+    const pageFooter = pages.length > 1
+      ? `<div class="page-num-footer" style="text-align:center;margin-top:4px;padding:3px 0;font-size:11px;font-weight:700;color:#555;letter-spacing:0.5px">${pi+1} 페이지 / ${pages.length} 페이지</div>`
+      : '';
+    return '<div class="page-block"' + (pi>0?' style="page-break-before:always"':'') + '>'
       + '<table class="schedule">' + colgroup + rows + '</table>'
       + pageFooter
       + '</div>';
@@ -15031,6 +15163,59 @@ async function printWindowSchedule(opts){
       if(v===null) return;
       try{ Promise.resolve(f(id, v)).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){}
     });
+    // 우측 상단 정보(모델/수량·TYPE/프레임색상/피스홀·테이핑/유리색상) 클릭 → 수동 입력
+    document.addEventListener('click', function(ev){
+      var t = ev.target && ev.target.closest ? ev.target.closest('.sched-info-edit') : null;
+      if(!t) return;
+      ev.preventDefault(); ev.stopPropagation();
+      if(document.getElementById('__schInfoModal')) return;
+      var esc = function(s){ return String(s||'').replace(/"/g,'&quot;'); };
+      var cur = {
+        model:      t.getAttribute('data-model')||'',
+        qtyType:    t.getAttribute('data-qtytype')||'',
+        frameColor: t.getAttribute('data-framecolor')||'',
+        piecehole:  t.getAttribute('data-piecehole')||'',
+        glassColor: t.getAttribute('data-glasscolor')||''
+      };
+      var row = function(id,label,val){
+        return '<label style="font-size:11px;color:#888">'+label+'</label>'
+          +'<input id="'+id+'" type="text" value="'+esc(val)+'" style="width:100%;box-sizing:border-box;padding:7px 9px;margin:3px 0 9px;border:1px solid #ccc;border-radius:6px;font-size:13px">';
+      };
+      var ov = document.createElement('div');
+      ov.id='__schInfoModal';
+      ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
+      ov.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px 22px;width:400px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.3);font-family:sans-serif">'
+        +'<div style="font-size:15px;font-weight:800;color:#1a4488;margin-bottom:3px">📝 우측 상단 정보 수동 입력</div>'
+        +'<div style="font-size:11px;color:#888;margin-bottom:12px">비워두고 저장하면 자동 계산값이 표시됩니다</div>'
+        +row('__si_model','모델', cur.model)
+        +row('__si_qtytype','수량 / TYPE', cur.qtyType)
+        +row('__si_frame','프레임 색상', cur.frameColor)
+        +row('__si_piece','내부 피스홀 가공 / 테이핑', cur.piecehole)
+        +row('__si_glass','유리색상', cur.glassColor)
+        +'<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:6px">'
+        +'<button type="button" id="__si_reset" style="padding:7px 12px;font-size:12px;border:1px solid #e0b070;background:#fff5e6;color:#7a4a00;border-radius:7px;cursor:pointer;font-weight:700">자동값 복원</button>'
+        +'<span style="display:flex;gap:8px">'
+        +'<button type="button" id="__si_cancel" style="padding:7px 14px;font-size:12px;border:1px solid #ccc;background:#f4f4f4;color:#555;border-radius:7px;cursor:pointer;font-weight:700">취소</button>'
+        +'<button type="button" id="__si_save" style="padding:7px 18px;font-size:12px;border:none;background:#1a4488;color:#fff;border-radius:7px;cursor:pointer;font-weight:800">저장</button>'
+        +'</span></div></div>';
+      ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+      document.body.appendChild(ov);
+      document.getElementById('__si_cancel').onclick=function(){ ov.remove(); };
+      document.getElementById('__si_save').onclick=function(){
+        var f=__schResolve('editScheduleInfo');
+        if(!f){ alert('편집 기능을 불러오지 못했습니다. 일람표를 새로 출력해 주세요.'); return; }
+        var v=function(id){ return document.getElementById(id).value; };
+        var a=v('__si_model'), b=v('__si_qtytype'), c=v('__si_frame'), d=v('__si_piece'), e2=v('__si_glass');
+        ov.remove();
+        try{ Promise.resolve(f(a,b,c,d,e2)).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){}
+      };
+      document.getElementById('__si_reset').onclick=function(){
+        var f=__schResolve('resetScheduleInfo');
+        if(!f){ alert('기능을 불러오지 못했습니다.'); return; }
+        ov.remove();
+        try{ Promise.resolve(f()).then(function(h){ if(h) __selfRedrawSchedule(h); }); }catch(e){}
+      };
+    });
   <\/script>`;
 
   const _st = _getScheduleTitle();
@@ -15046,6 +15231,9 @@ async function printWindowSchedule(opts){
   .page{width:210mm;margin:0 auto;padding:6px 10px}
   /* 창호 번호(빨간 원 숫자) 숨김 — 부호(PW1 등)와 헷갈리지 않게 필요 시 끄기 */
   .page.hide-num .sch-num{display:none !important}
+  /* 단일 페이지: A4 높이를 채우고 하단 블록(페이지번호+발주문구)을 맨 아래로 */
+  .page.single-page{display:flex;flex-direction:column;min-height:287mm;box-sizing:border-box}
+  .page.single-page .sched-bottom{margin-top:auto}
   .header-wrap{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px;border-bottom:2px solid #1a2a50;padding-bottom:2px}
   .header-left{font-size:11px;line-height:2}
   .header-center{text-align:center;flex:1}
@@ -15105,6 +15293,9 @@ async function printWindowSchedule(opts){
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     html,body{padding:0;margin:0;width:auto}
     .page{padding:1mm 3mm;width:auto;max-width:210mm;margin:0 auto}
+    /* 단일 페이지: 인쇄 시에도 A4 높이 채워 하단 블록을 맨 아래로 (2페이지로 넘치지 않게 보수적 높이) */
+    .page.single-page{display:flex;flex-direction:column;min-height:283mm;box-sizing:border-box}
+    .page.single-page .sched-bottom{margin-top:auto}
     .ctrl-bar{display:none}
     @page{size:A4 portrait;margin:3mm}
     table.schedule{font-size:10px;table-layout:fixed}
@@ -15133,9 +15324,7 @@ async function printWindowSchedule(opts){
     .handle-row{margin-bottom:1px !important;font-size:10px !important}
     .header-wrap{margin-bottom:1px !important;padding-bottom:1px !important}
     .footer-note{margin-top:1px !important;padding-top:1px !important;font-size:8px !important}
-    .page-num-footer{position:absolute !important;left:0 !important;right:0 !important;bottom:0 !important;margin-top:0 !important;padding:1px 0 !important;font-size:10px !important}
-    .page-block{min-height:255mm !important}
-    .page-block.pb-first{min-height:225mm !important}
+    .page-num-footer{margin-top:2px !important;padding:1px 0 !important;font-size:10px !important}
     .page-block:last-child{page-break-after:auto; break-after:auto}
   }
 </style>
@@ -15147,7 +15336,7 @@ async function printWindowSchedule(opts){
   <label style="margin-left:14px"><input type="checkbox" id="chk-sch-num" checked onchange="var v=this.checked;document.querySelectorAll('.page').forEach(function(p){v?p.classList.remove('hide-num'):p.classList.add('hide-num')});try{localStorage.setItem('decco_sched_shownum',v?'1':'0')}catch(e){}"> 창호 번호</label>
   <label><input type="checkbox" id="chk-cell-info" onchange="document.querySelectorAll('.page').forEach(function(p){this.checked?p.classList.remove('hide-info'):p.classList.add('hide-info')},this)"> m² / 평 / kg 표시</label>
 </div>
-<div class="page hide-info">
+<div class="page hide-info${pages.length===1?' single-page':''}">
   ${specialNotesText ? `<div style="background:#fff3f3;border:1.5px solid #d92e2e;border-radius:4px;padding:7px 12px;margin-bottom:8px;color:#d92e2e;font-weight:700;font-size:13px;line-height:1.4">⚠ 특기사항: ${specialNotesText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
   <div class="header-wrap">
     <div class="header-left">
@@ -15162,20 +15351,29 @@ async function printWindowSchedule(opts){
       <h1>${_st.title}</h1>
       <h2>${_st.note}</h2>
     </div>
-    <div class="header-right">
-      모 델 : Decco<br>
-      수 량 : ${totalQty} set${cancelledCount?` <span style="color:#cc0000;font-weight:700">(❌취소 ${cancelledCount})</span>`:''} / TYPE : ${buildType||'RC'}<br>
-      프레임 색상 : 외부 : ${colorOut} / 내부 : ${colorIn}<br>
-      내부 피스홀 가공 : ${pieceholeVal} / ${tapingLabel}<br>
-      유리색상 : 투명
+    <div class="header-right sched-info-edit" title="클릭 → 수동 입력 (비우면 자동값)" style="cursor:pointer;position:relative"
+         data-model="${(_si.model||'Decco').replace(/"/g,'&quot;')}"
+         data-qtytype="${(_si.qtyType||_siAuto.qtyType).replace(/"/g,'&quot;')}"
+         data-framecolor="${(_si.frameColor||_siAuto.frameColor).replace(/"/g,'&quot;')}"
+         data-piecehole="${(_si.piecehole||_siAuto.piecehole).replace(/"/g,'&quot;')}"
+         data-glasscolor="${(_si.glassColor||_siAuto.glassColor).replace(/"/g,'&quot;')}">
+      모 델 : ${_si.model || 'Decco'}<br>
+      수 량 : ${_si.qtyType || `${totalQty} set${cancelledCount?` <span style="color:#cc0000;font-weight:700">(❌취소 ${cancelledCount})</span>`:''} / TYPE : ${buildType||'RC'}`}<br>
+      프레임 색상 : ${_si.frameColor || _siAuto.frameColor}<br>
+      내부 피스홀 가공 : ${_si.piecehole || _siAuto.piecehole}<br>
+      유리색상 : ${_si.glassColor || _siAuto.glassColor}
+      <span class="no-print" style="position:absolute;top:-4px;right:-4px;font-size:11px;color:#1a4488;background:#eef3fb;border:1px solid #b8c8e0;border-radius:8px;padding:0 5px">✎</span>
     </div>
   </div>
 
   ${tableRows}
 
-  <div class="footer-note">
-    <span>※ 발주 전 반드시 창호 사이즈 및 핸들 작동방향, 수량 등을 꼭 확인하시고 발주하시기 바랍니다</span>
-    <span class="confirm">발주자 확인 : <span class="confirm-box"></span> (인)</span>
+  <div class="sched-bottom">
+    ${pages.length===1 ? `<div class="page-num-footer" style="text-align:center;padding:3px 0;font-size:11px;font-weight:700;color:#555;letter-spacing:0.5px">1 페이지 / 1 페이지</div>` : ''}
+    <div class="footer-note">
+      <span>※ 발주 전 반드시 창호 사이즈 및 핸들 작동방향, 수량 등을 꼭 확인하시고 발주하시기 바랍니다</span>
+      <span class="confirm">발주자 확인 : <span class="confirm-box"></span> (인)</span>
+    </div>
   </div>
 </div>
 
@@ -15764,7 +15962,7 @@ function printWorkOrders(){
         : '';
       svgDiagram = `<div style="position:relative;background:#fff;width:100%;height:${calcH}mm;display:flex;align-items:center;justify-content:center;overflow:visible">
         <img src="${wo.customImgData}" alt="이형 도면" style="max-width:100%;max-height:100%;object-fit:contain;display:block">
-        <div style="position:absolute;top:3px;right:3px;background:#e07020;color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:10px;border:1.5px solid #a04000;box-shadow:0 1px 3px rgba(0,0,0,.2)">⚠ 이형</div>
+        <div style="position:absolute;top:3px;right:3px;background:#e07020;color:#fff;font-size:11px;font-weight:800;padding:2px 10px;border-radius:10px;border:1.5px solid #a04000;box-shadow:0 1px 3px rgba(0,0,0,.2)">⚠ ${irrLabel(wo)}</div>
         ${imgBadge}
       </div>`;
     } else if(wo.svgSnapshot && wo.svgViewBox){
@@ -16228,7 +16426,7 @@ function printWorkOrders(){
         </tr>
         <tr>
           <td style="${lbl}">창호 타입</td>
-          <td colspan="3" style="${val}font-weight:700">${typeLabel}${wo.customImgData?' <span style="display:inline-block;background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;border:1.5px solid #a04000;margin-left:6px;vertical-align:middle">⚠ ${irrLabel(wo)}</span>':''}</td>
+          <td colspan="3" style="${val}font-weight:700">${typeLabel}${wo.customImgData?' <span style="display:inline-block;background:#e07020;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;border:1.5px solid #a04000;margin-left:6px;vertical-align:middle">⚠ '+irrLabel(wo)+'</span>':''}</td>
         </tr>
         <tr>
           <td style="${lbl}">색 상</td>
@@ -16359,7 +16557,7 @@ function printWorkOrders(){
   <span style="font-weight:700;color:#1a2a50;margin-right:6px">📊 도면 정보 표시:</span>
   <label>
     <input type="checkbox" id="toggle-cell-info"
-      onchange="document.querySelectorAll('.wo-root, body').forEach(function(el){el.classList.toggle('hide-cell-info', !this.checked)}, this)">
+      onchange="document.querySelectorAll('.wo-root, body').forEach(function(el){el.classList.toggle('hide-cell-info', !this.checked)}, this); if(window.__fitWoPages) setTimeout(window.__fitWoPages,30);">
     m² / 평 / kg 표시
   </label>
   <span style="margin-left:auto;color:#666;font-size:10px">※ 이 도구는 인쇄 시 숨겨집니다</span>
@@ -17018,6 +17216,7 @@ function autosave(){
       orderItems, orderCnt,
       // 일람표 공란 위치 (창호일람표에서만 사용)
       scheduleBlanks: _scheduleBlankList(),
+      schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
       // 프로젝트 전역 설정
       hwType: _hwType,
       hwEurRate: _hwEurRate,
@@ -17126,6 +17325,7 @@ function tryAutorestore(){
       orderCnt   = data.orderCnt || (Math.max(0, ...data.orderItems.map(i=>i.id)) + 1);
       // 일람표 공란 복원 (없으면 비움 — 다른 견적과 섞이지 않도록)
       _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
+      _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
       // 프로젝트 전역 설정 복원
       if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
         _hwEurRate = data.hwEurRate;
@@ -17144,6 +17344,9 @@ function tryAutorestore(){
       window._projectNote = (data.projectNote || '').trim();
       try { localStorage.setItem('gealan_project_note', window._projectNote); } catch(_){}
       renderOrder();
+      // ★ 클라우드 로드와 동일하게: 복원된 유리/방충망 'none' 설정에 맞춰 단가조정(제외) 자동 동기화
+      //    (renderOrder 내부 호출만으로는 패널/비용 갱신 타이밍상 반영이 누락될 수 있어 명시적으로 한 번 더 호출)
+      if(typeof autoSyncAdjExclude === 'function') autoSyncAdjExclude();
       updateAutosaveBadge();
     }
   } catch(e){ try{ if(console && console.warn) console.warn('autorestore failed', e); }catch(_){} }
@@ -17164,6 +17367,7 @@ function saveProject(){
     site, orderItems, orderCnt,
     // 일람표 공란 위치 (창호일람표에서만 사용)
     scheduleBlanks: _scheduleBlankList(),
+    schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
     // 프로젝트 전역 설정
     hwType: _hwType,
     hwEurRate: _hwEurRate,
@@ -17225,6 +17429,7 @@ function loadProject(event){
         orderCnt   = data.orderCnt || (Math.max(0, ...data.orderItems.map(i=>i.id)) + 1);
         // 일람표 공란 복원 (없으면 비움)
         _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
+        _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
         // 교체 모드일 때만 프로젝트 전역 설정도 같이 복원
         if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
           _hwEurRate = data.hwEurRate;
@@ -17379,6 +17584,7 @@ async function saveToCloud(){
     orderItems,
     orderCnt,
     scheduleBlanks: _scheduleBlankList(),
+    schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
     hwType: _hwType,
     hwEurRate: _hwEurRate,
     doorType: _doorType
@@ -19685,6 +19891,7 @@ async function loadFromCloud(projectId){
 
     // 일람표 공란 복원 (없으면 비움 — 다른 프로젝트와 섞이지 않도록)
     _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
+    _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
 
     // 전역 설정 복원
     if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
@@ -21555,6 +21762,7 @@ async function saveCloudAutosave(){
     orderItems,
     orderCnt,
     scheduleBlanks: _scheduleBlankList(),
+    schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
     hwType: _hwType,
     hwEurRate: _hwEurRate,
     doorType: _doorType
@@ -21621,6 +21829,7 @@ async function restoreFromCloudAutosave(){
 
     // 일람표 공란 복원 (없으면 비움)
     _setScheduleBlankList(Array.isArray(cloudData.scheduleBlanks) ? cloudData.scheduleBlanks : []);
+    _setSchedMeta(cloudData.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
 
     if(typeof cloudData.hwEurRate === 'number') _hwEurRate = cloudData.hwEurRate;
     if(cloudData.hwType && typeof setHwType === 'function') setHwType(cloudData.hwType);
