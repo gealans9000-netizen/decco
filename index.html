@@ -569,7 +569,7 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
     </div>
     </div><!-- /sg-green -->
     <div class="sg sg-blue">
-    <div class="sec-color sec-c1"><span class="sec-icon">🎨</span> 색상</div>
+    <div class="sec-color sec-c1"><span class="sec-icon">🎨</span> 색상 <span id="colorUnsetWarn" style="display:none;margin-left:8px;font-size:11px;font-weight:800;color:#fff;background:#e8590c;padding:2px 8px;border-radius:10px;animation:none">⚠ 색상 미확정</span></div>
     <div class="row2">
       <div class="fg"><label class="lbl">외부 색상</label>
         <select id="colorOut" onchange="onColorOutChange()">
@@ -577,6 +577,7 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
           <option value="black">블랙</option>
           <option value="painting_out">도장</option>
           <option value="wrapping_out">랩핑</option>
+          <option value="unset_out">⚠ 미확정</option>
         </select>
       </div>
       <div class="fg"><label class="lbl">내부 색상</label>
@@ -584,6 +585,7 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
           <option value="white">화이트</option>
           <option value="painting_in">도장</option>
           <option value="wrapping_in">랩핑</option>
+          <option value="unset_in">⚠ 미확정</option>
         </select>
       </div>
     </div>
@@ -2388,7 +2390,13 @@ function dn(x){return (DNAME&&DNAME[x])||x;}
 
 function isBlack(){return document.getElementById('colorOut').value==='black'}
 function colorLabel(val){
-  return {white:'화이트',black:'블랙',painting_out:'도장',painting_in:'도장',wrapping_out:'랩핑',wrapping_in:'랩핑'}[val]||'화이트';
+  return {white:'화이트',black:'블랙',painting_out:'도장',painting_in:'도장',wrapping_out:'랩핑',wrapping_in:'랩핑',unset_out:'미확정',unset_in:'미확정'}[val]||'화이트';
+}
+// 색상 미확정 여부 (외부/내부 중 하나라도 미확정이면 true)
+function isColorUnset(){
+  const o=document.getElementById('colorOut')?.value;
+  const i=document.getElementById('colorIn')?.value;
+  return o==='unset_out' || i==='unset_in';
 }
 function colorOutLabel(){ return colorLabel(document.getElementById('colorOut').value); }
 function colorInLabel(){  return colorLabel(document.getElementById('colorIn')?.value||'white'); }
@@ -2848,8 +2856,9 @@ function bulkUpdateField(itemId, field, value){
   }
   else if(field==='colorOut'){
     if(item.snapshot) item.snapshot.colorOut = value;
-    if(item.wo) item.wo.colorOut = value==='black' ? '블랙' : '화이트';
-    item.color = value==='black' ? '블랙' : '화이트';
+    const _outLbl = value==='unset_out' ? '미확정' : (value==='black' ? '블랙' : '화이트');
+    if(item.wo) item.wo.colorOut = _outLbl;
+    item.color = _outLbl;
     // T/S 도면: 외부색상에 따라 상부/하부 덧바 자동 설정
     //   연장바 25mm 단일 (데코)
     const isTS = (item.baseType === 'TS' || item.snapshot?.baseType === 'TS');
@@ -2866,7 +2875,7 @@ function bulkUpdateField(itemId, field, value){
   }
   else if(field==='colorIn'){
     if(item.snapshot) item.snapshot.colorIn = value;
-    if(item.wo) item.wo.colorIn = value==='black' ? '블랙' : '화이트';
+    if(item.wo) item.wo.colorIn = value==='unset_in' ? '미확정' : (value==='black' ? '블랙' : '화이트');
   }
   else if(field==='tapingSel'){
     if(item.snapshot){
@@ -3484,8 +3493,8 @@ function buildBulkBar(){
     {f:'location', label:'위치',     type:'text', ph:'거실'},
     {f:'buildType',label:'TYPE (건물구조)', type:'select', opts:[['','-'],['목조','목조'],['RC','RC'],['판넬','판넬']]},
     {f:'notes',    label:'전체 특기사항', type:'text', ph:'예: 모든 창호 공통 사항'},
-    {f:'colorOut', label:'외부창 색상', type:'select', opts:[['white','화이트'],['black','블랙'],['painting_out','도장'],['wrapping_out','랩핑']]},
-    {f:'colorIn',  label:'내부창 색상', type:'select', opts:[['white','화이트'],['black','블랙']]},
+    {f:'colorOut', label:'외부창 색상', type:'select', opts:[['white','화이트'],['black','블랙'],['painting_out','도장'],['wrapping_out','랩핑'],['unset_out','⚠ 미확정']]},
+    {f:'colorIn',  label:'내부창 색상', type:'select', opts:[['white','화이트'],['black','블랙'],['unset_in','⚠ 미확정']]},
     {f:'tapingSel',label:'기밀테이프',  type:'select', opts:[['both','내+외부'],['in','내부'],['out','외부'],['none','없음']]},
     {f:'pieceholeSel', label:'피스홀', type:'select', opts:[['yes','있음'],['no','없음']]},
     {f:'screenSel', label:'방충망', type:'select', opts:[['auto','자동'],['roll','롤'],['pleat','주름'],['none','없음']]},
@@ -3585,8 +3594,8 @@ function buildRow(item, idx){
     '<td><select onchange="update('+item.id+',\\'buildType\\',this.value)">'+btOpts+'</select></td>' +
     '<td><input value="'+esc(item.notes)+'" onblur="update('+item.id+',\\'notes\\',this.value)" oninput="debouncedUpdate('+item.id+',\\'notes\\',this.value)"></td>' +
     '<td><input value="'+esc(item.itemNote||'')+'" onblur="update('+item.id+',\\'itemNote\\',this.value)" oninput="debouncedUpdate('+item.id+',\\'itemNote\\',this.value)" placeholder="이 창호만"></td>' +
-    '<td><select onchange="update('+item.id+',\\'colorOut\\',this.value)"><option value="white"'+(colorOut==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorOut==='black'?' selected':'')+'>블랙</option><option value="painting_out"'+(colorOut==='painting_out'?' selected':'')+'>도장</option><option value="wrapping_out"'+(colorOut==='wrapping_out'?' selected':'')+'>랩핑</option></select></td>' +
-    '<td><select onchange="update('+item.id+',\\'colorIn\\',this.value)"><option value="white"'+(colorIn==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorIn==='black'?' selected':'')+'>블랙</option></select></td>' +
+    '<td><select onchange="update('+item.id+',\\'colorOut\\',this.value)"><option value="white"'+(colorOut==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorOut==='black'?' selected':'')+'>블랙</option><option value="painting_out"'+(colorOut==='painting_out'?' selected':'')+'>도장</option><option value="wrapping_out"'+(colorOut==='wrapping_out'?' selected':'')+'>랩핑</option><option value="unset_out"'+(colorOut==='unset_out'||colorOut==='미확정'?' selected':'')+'>⚠ 미확정</option></select></td>' +
+    '<td><select onchange="update('+item.id+',\\'colorIn\\',this.value)"><option value="white"'+(colorIn==='white'?' selected':'')+'>화이트</option><option value="black"'+(colorIn==='black'?' selected':'')+'>블랙</option><option value="unset_in"'+(colorIn==='unset_in'||colorIn==='미확정'?' selected':'')+'>⚠ 미확정</option></select></td>' +
     '<td><select onchange="update('+item.id+',\\'tapingSel\\',this.value)"><option value="both"'+(taping==='both'?' selected':'')+'>내+외부</option><option value="in"'+(taping==='in'?' selected':'')+'>내부</option><option value="out"'+(taping==='out'?' selected':'')+'>외부</option><option value="none"'+(taping==='none'?' selected':'')+'>없음</option></select></td>' +
     '<td><select onchange="update('+item.id+',\\'pieceholeSel\\',this.value)"><option value="yes"'+(piece==='yes'?' selected':'')+'>있음</option><option value="no"'+(piece==='no'?' selected':'')+'>없음</option></select></td>' +
     '<td><select class="'+(gType!=='G5'?'glass-changed':'')+'" onchange="update('+item.id+',\\'glassType\\',this.value);refreshTable()">'+glassOptsOpen+'</select></td>' +
@@ -8088,6 +8097,11 @@ function onColorOutChange(){
 // 메인 업데이트
 // ────────────────────────────────────────────────
 function update(){
+  // 색상 미확정 경고 배지 갱신
+  try{
+    const _cw=document.getElementById('colorUnsetWarn');
+    if(_cw) _cw.style.display = isColorUnset() ? 'inline-block' : 'none';
+  }catch(_){}
   const W=parseInt(document.getElementById('iW').value)||3000;
   const H=parseInt(document.getElementById('iH').value)||2100;
   const nV=Math.min(5,Math.max(0,parseInt(document.getElementById('vMul').value)||0));
@@ -10187,6 +10201,7 @@ function buildGBListHTML(){
   const gbList = [];
   orderItems.forEach((item, idx) => {
     if(item.cancelled) return;  // ★ 취소 항목 제외
+      if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 GB 발주 보류
     if(!item.wo) return;
     const qty = item.qty || 1;
     const winNum = getDisplayNum(item, idx);
@@ -10580,6 +10595,7 @@ function batchExcel(){
     sheets += `<tr style="font-weight:700;font-size:14px;color:#333;text-align:center"><td style="text-align:center">창호번호</td><td style="text-align:center">가로(mm)</td><td style="text-align:center">세로(mm)</td><td style="text-align:center">수량</td><td style="text-align:center">부호(위치)</td><td style="text-align:center">구분</td></tr>`;
     orderItems.forEach((item, idx)=>{
       if(item.cancelled) return;  // ★ 취소 항목 제외
+      if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 제외 (색상 확정 후 반영)
       if(!item.wo) return;
       const winNum = (typeof getDisplayNum === 'function') ? getDisplayNum(item, idx) : (idx+1);
       const mark = item.mark || '';
@@ -10629,6 +10645,7 @@ function batchExcel(){
     };
     orderItems.forEach((item, idx) => {
       if(item.cancelled) return;  // ★ 취소 항목 제외
+      if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 제외 (색상 확정 후 반영)
       if(!item.wo || !Array.isArray(item.wo.screens)) return;
       const winNum = (typeof getDisplayNum === 'function') ? getDisplayNum(item, idx) : (idx+1);
       const mark = item.mark || '';
@@ -10751,6 +10768,7 @@ function batchExcel(){
     sheets += `<tr style="font-weight:700;font-size:14px;color:#333;text-align:center"><td style="text-align:center">창호번호</td><td style="text-align:center">가로(mm)</td><td style="text-align:center">세로(mm)</td><td style="text-align:center">수량</td><td style="text-align:center">부호(위치)</td><td style="text-align:center">구분</td><td style="text-align:center">GB 종류</td></tr>`;
     orderItems.forEach((item, idx) => {
       if(item.cancelled) return;  // ★ 취소 항목 제외
+      if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 제외 (색상 확정 후 반영)
       if(!item.wo) return;
       const winNum = (typeof getDisplayNum === 'function') ? getDisplayNum(item, idx) : (idx+1);
       const mark = item.mark || '';
@@ -13205,6 +13223,19 @@ function applyRounding(pageKey){
 
 // 외부 색상 라벨 결정 ('블랙'/'화이트') — 절단·재고 차감 색상 판정용
 // 우선순위: wo.colorOut(한글) → snapshot.colorOut(black/white) → item.color → wo.blk → 화이트
+// 창호 항목이 색상 미확정인지 (표시/경고 전용 — 절단·재고는 화이트로 처리)
+function _isItemColorUnset(item){
+  const sn = item && item.snapshot;
+  const wo = item && item.wo;
+  const o = (sn && sn.colorOut) || (wo && wo.colorOut) || item && item.color;
+  const i = (sn && sn.colorIn)  || (wo && wo.colorIn);
+  return o==='unset_out' || o==='미확정' || i==='unset_in' || i==='미확정';
+}
+
+// 절단·재고·유리·방충망·GB 발주에서 제외할 창호인지
+// (색상 미확정 창호는 색상 확정 전까지 생산 지시에서 완전 보류)
+function _isCutExcluded(item){ return _isItemColorUnset(item); }
+
 function _extColorLabel(item){
   const wo = item && item.wo;
   if(wo){
@@ -13229,6 +13260,7 @@ function buildCutData(srcItems){
   // 각 창호의 qty × 절단수량으로 누적
   // 프레임·샤시만 +5mm (용접 여유)
   const WELD = 5;
+  const _excludedUnset = [];  // 색상 미확정으로 제외된 창호 부호 목록
 
   // 누적 맵: key → {size, qty, items:[부호 목록]}
   const maps = {
@@ -13262,6 +13294,8 @@ function buildCutData(srcItems){
     const itemNo = `[${getDisplayNum(item, idx)}]`;
     const mark = `${itemNo}${item.mark ? ' '+item.mark : item.location ? ' '+item.location : ''}`.trim();
     if(!wo) return;
+    // ★ 색상 미확정 창호는 절단·재고에서 완전 제외 (색상 확정 후 반영)
+    if(_isCutExcluded(item)){ _excludedUnset.push(mark || itemNo); return; }
     const col = _extColorLabel(item);  // 외부 색상('블랙'/'화이트') — 재고는 이 색으로 차감
 
     // ── 프레임: W+5, H+5, 각 2개 × qty ──
@@ -13355,6 +13389,8 @@ function buildCutData(srcItems){
     }
     if(rows.length) result[cat] = rows;
   }
+  try{ Object.defineProperty(result, '_excludedUnset', {value:_excludedUnset, enumerable:false}); }
+  catch(_){ result._excludedUnset = _excludedUnset; }
   return result;
 }
 
@@ -13498,7 +13534,17 @@ function renderCutList(){
   const profBlocks = PROFILE_CATS.filter(c=>data[c]).map(c=>catBlock(c,data[c])).join('');
   const reinfBlocks = REINF_CATS.filter(c=>data[c]).map(c=>catBlock(c,data[c])).join('');
 
-  let html = `
+  // 색상 미확정으로 제외된 창호 안내
+  const _exU = (data._excludedUnset||[]);
+  const unsetBanner = _exU.length ? `
+    <div style="font-size:11px;font-weight:700;color:#8a3d00;background:#ffe8cc;
+                border:1px solid #ffa94d;border-radius:6px;padding:7px 10px;margin-bottom:10px;line-height:1.5">
+      ⚠ 색상 미확정 ${_exU.length}개 창호는 절단·재고에서 제외되었습니다.<br>
+      <span style="font-weight:500;color:#a04000">${_exU.join(', ')}</span><br>
+      <span style="font-weight:500;color:#a04000;font-size:10px">→ 색상 확정 후 자동으로 포함됩니다.</span>
+    </div>` : '';
+
+  let html = unsetBanner + `
     <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;
                 padding:5px 8px;background:rgba(91,141,239,.08);border-radius:5px;
                 border-left:3px solid var(--accent)">
@@ -13859,6 +13905,7 @@ function printGlassScreenList(opt){
   const glassList = [];
   orderItems.forEach((item,idx)=>{
     if(item.cancelled) return;  // ★ 취소된 창호는 유리 발주에서 제외
+    if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 발주 보류
     if(!item.wo) return;
     const qty = item.qty||1;
     const winNum = getDisplayNum(item, idx);
@@ -14014,6 +14061,7 @@ function printGlassScreenList(opt){
   const screenList = [];
   orderItems.forEach((item,idx)=>{
     if(item.cancelled) return;  // ★ 취소된 창호는 방충망 발주에서 제외
+    if(_isCutExcluded(item)) return;  // ★ 색상 미확정 창호는 발주 보류
     if(!item.wo) return;
     const qty = item.qty||1;
     const winNum = getDisplayNum(item, idx);
@@ -14679,7 +14727,8 @@ async function printWindowSchedule(opts){
     'bronze':'브론즈', 'mocha':'모카', 'oak':'오크', 'walnut':'월넛',
     'cherry':'체리', 'mahogany':'마호가니', 'gold':'골드', 'beige':'베이지',
     'painting_out':'도장', 'painting_in':'도장',
-    'wrapping_out':'랩핑', 'wrapping_in':'랩핑'
+    'wrapping_out':'랩핑', 'wrapping_in':'랩핑',
+    'unset_out':'미확정', 'unset_in':'미확정'
   };
   function colorToLabel(code, fallbackEl){
     if(code && COLOR_LABELS[code]) return COLOR_LABELS[code];
@@ -16438,7 +16487,7 @@ function printWorkOrders(){
         </tr>
         <tr>
           <td style="${lbl}">색 상</td>
-          <td colspan="3" style="${valL}font-size:10px">외부: ${wo.colorOut}<br>내부: ${wo.colorIn}</td>
+          <td colspan="3" style="${valL}font-size:10px${(wo.colorOut==='미확정'||wo.colorIn==='미확정')?';color:#c92a2a;font-weight:800':''}">외부: ${wo.colorOut}<br>내부: ${wo.colorIn}${(wo.colorOut==='미확정'||wo.colorIn==='미확정')?' <span style=\'font-size:9px\'>⚠ 화이트로 제작 예정</span>':''}</td>
         </tr>
         <tr>
           <td style="${lbl}">수 량</td>
@@ -22267,6 +22316,7 @@ function _invCouplers(srcItems){
   let m92=0, m108=0, m64=0;
   for(const it of (srcItems||[])){
     if(it.cancelled) continue;
+    if(_isCutExcluded(it)) continue;  // ★ 색상 미확정 창호는 재고 차감 제외
     const wo = it.wo, q = it.qty || 1;
     if(!wo || !Array.isArray(wo.mullions)) continue;
     for(const m of wo.mullions){
@@ -22288,6 +22338,7 @@ function _invGBConsumption(srcItems){
   let gb47M = 0, gb24M = 0; // 누적 둘레(m)
   for(const item of items){
     if(!item || item.cancelled || !item.wo) continue;
+    if(_isCutExcluded(item)) continue;  // ★ 색상 미확정 창호는 재고 차감 제외
     const qty = item.qty || 1;
     const gbType = (item.snapshot && item.snapshot.gbType) || 'GB47';
     let perimM = 0; // 이 항목 유리들의 둘레 합(m, 수량 미반영)
