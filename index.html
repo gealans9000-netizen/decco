@@ -1467,11 +1467,11 @@ W × H / 91809 = 평 (최소 3평), 평 × 단가/평
         </label>
         <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#e07020;cursor:pointer;margin-bottom:8px">
           <input type="checkbox" id="chk-cost-review" style="accent-color:#e07020;width:13px;height:13px">
-          🔍 원가 검토
+          🔍 계산 검토
         </label>
         <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#1a8a5a;cursor:pointer;margin-bottom:8px" title="현장 전체 창호의 자재별 합계 (프레임/유리/방충망/하드웨어 등)">
           <input type="checkbox" id="chk-material-summary" style="accent-color:#1a8a5a;width:13px;height:13px">
-          📊 현장 자재 합계
+          📊 원가비교 (자재합계)
         </label>
         <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#0d7a6f;cursor:pointer;margin-bottom:8px" title="임가공(조립) 비용 정산 — 자재는 의뢰업체 제공, 조립비만 산정">
           <input type="checkbox" id="chk-labor-cost" style="accent-color:#0d7a6f;width:13px;height:13px">
@@ -8928,6 +8928,7 @@ function clearOrder(){
   orderItems = [];
   _setScheduleBlankList([]);
   _setSchedMeta(null);   // 새 프로젝트 → 일람표 수동입력 초기화
+  _setAdjState({exclude:{},rates:{},manual:{},manualAdjs:[],fixedTransport:'',fixedLabor:''});   // 새 프로젝트 → 조정 초기화
   selectedItemIds.clear();
   // ★ 새 프로젝트 시작으로 간주 — 클라우드 ID 끊기 (다음 ☁️ 저장은 새 프로젝트로)
   if(typeof _currentCloudProjectId !== 'undefined') _currentCloudProjectId = null;
@@ -9034,11 +9035,11 @@ async function batchPrint(){
     }
     if(chkCostReview){
       const h = buildCostReviewHTML();
-      if(h) sections.push({title:'원가 검토', html:h});
+      if(h) sections.push({title:'계산 검토', html:h});
     }
     if(chkMatSummary){
       const h = buildMaterialSummaryHTML();
-      if(h) sections.push({title:'현장 자재 합계', html:h});
+      if(h) sections.push({title:'원가비교 (자재합계)', html:h});
     }
     if(chkLaborCost){
       const h = getBatchLaborCostHTML();
@@ -11864,37 +11865,17 @@ function buildCostReviewHTML(){
 
   const totalQty = orderItems.reduce((s,i)=>s+(i.qty||1),0);
   // 전체 공급가 합계 — 항목별 조정 반영
-  function calcItemAdjTotal(item){
-    const rows = item.breakdownRows || [];
-    if(!rows.length) return (item.grandTotal||0);
-    let unit = 0;
-    rows.forEach(b => {
-      const s = String(b.label||'');
-      let cat = null;
-      if(s.includes('프레임') && !s.includes('보강재')) cat = 'profile';
-      else if(s.includes('샤시') && !s.includes('보강재')) cat = 'profile';
-      else if(s.includes('중간바') && !s.includes('보강재')) cat = 'profile';
-      else if(s.includes('보강재')) cat = 'reinf';
-      else if(s.includes('유리')) cat = 'glass';
-      else if(s.includes('GB')) cat = 'gb';
-      else if(s.includes('커플링')) cat = 'coupl';
-      else if(s.includes('하드웨어') || s.includes('레일')) cat = 'rail';
-      else if(s.includes('방충망')) cat = 'screen';
-      else if(s.includes('연장바') || s.includes('덧바')) cat = 'addon';
-      else if(s.includes('네일핀')) cat = 'nail';
-      else if(s.includes('풍압')) cat = 'wind';
-      else if(s.includes('직각')) cat = 'angle90';
-      else if(s.includes('후레슁')) cat = 'flashing';
-      else if(s.includes('기밀테이프')) cat = 'taping';
-      else if(s.includes('공임비')) cat = 'labor';
-      const excl = cat && adjExclude && adjExclude[cat];
-      const rate = (cat && adjRates && adjRates[cat]) || 0;
-      if(!excl) unit += (b.val||0) * (1 + rate/100);
-    });
-    return Math.round(unit) * (item.qty||1);
-  }
+  // 원가검토 항목별 합계 — 공용 함수로 위임 (화면·견적서와 동일)
+  function calcItemAdjTotal(item){ return calcItemSupplyTotal(item); }
   // ★ 취소된 창호는 원가 검토에서 제외 (단, 원본 idx를 유지하여 번호 일관성 유지)
   const grandTotal = orderItems.reduce((s,i)=>i.cancelled ? s : (s+calcItemAdjTotal(i)),0);
+  // ★ 제작 원가(증감% 0% 기준, 제외 X는 반영) 합계와 조정 차액 — 마진 한눈에 확인
+  const costGrand = orderItems.reduce((s,i)=>i.cancelled ? s : (s+calcItemCostTotal(i)),0);
+  const adjDiff = grandTotal - costGrand;
+  const adjPct = costGrand ? (adjDiff / costGrand * 100) : 0;
+  const _hasAdj = Math.abs(adjDiff) >= 1;
+  const _diffColor = adjDiff > 0 ? '#c0392b' : '#1a8050';
+  const _diffSign  = adjDiff > 0 ? '+' : '';
 
   // 창호별 상세 블록 (취소된 항목은 표시 자체에서 빠짐)
   const itemBlocks = orderItems.map((item, idx)=>{
@@ -11974,13 +11955,19 @@ function buildCostReviewHTML(){
         </div>`;
 
     // 합계 행
-    const origUnit = item.unitTotal || 0;
-    const adjusted = unitAdjusted !== origUnit;
+    // 제작 원가 단가(제외 X는 반영, 증감% 0%) — 항목별 차액 표시용
+    const unitCost = calcItemCostTotal(item) / qty;
+    const itemCost = Math.round(unitCost) * qty;
+    const diffAmt  = itemTotal - itemCost;
+    const _rowHasAdj = Math.abs(diffAmt) >= 1;
+    const _rowDiffColor = diffAmt > 0 ? '#c00' : '#1a8050';
+    const _rowDiffSign  = diffAmt > 0 ? '+' : '';
     const totalRow = `<div class="cr-row total">
-      <div class="cr-label">합계 × ${qty} set${adjusted?' <span style="font-size:10px;color:#e07020;font-weight:700">(조정반영)</span>':''}</div>
+      <div class="cr-label">합계 × ${qty} set${_rowHasAdj?' <span style="font-size:10px;color:#e07020;font-weight:700">(조정반영)</span>':''}</div>
       <div class="cr-val">
-        ${adjusted?`<span style="color:#888;text-decoration:line-through;font-size:11px;margin-right:6px">${fmt(origUnit)}</span>`:''}
-        단가 ${fmt(unitAdjusted)} × ${qty} = <span style="color:#c00;font-size:15px">${fmt(itemTotal)}</span>
+        ${_rowHasAdj?`<span style="font-size:11px;color:#5a6b8a">원가 ${fmt(itemCost)}</span>
+        <span style="font-size:11px;color:${_rowDiffColor};margin:0 6px">${_rowDiffSign}${fmt(diffAmt)}</span><br>`:''}
+        단가 ${fmt(Math.round(unitAdjusted))} × ${qty} = <span style="color:#c00;font-size:15px">${fmt(itemTotal)}</span>
       </div>
     </div>`;
 
@@ -12031,17 +12018,37 @@ function buildCostReviewHTML(){
   <div class="cr-wrap">
     <div class="cr-hdr">
       <div>
-        <div class="cr-title">🔍 원가 검토 — 창호별 상세 내역</div>
+        <div class="cr-title">🔍 계산 검토 — 창호별 상세 내역</div>
         <div class="cr-meta">Decco | ${site} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
       ${_siteColorBar()}
     </div>
     <div class="cr-summary">
-      <div>📊 전체 공급가 합계</div>
-      <div class="cr-summary-val">${fmt(grandTotal)}</div>
+      <div>📊 전체 공급가 합계${_hasAdj?' <span style="font-size:11px;font-weight:600;color:#e8f0ff;opacity:.85">(조정 반영)</span>':''}</div>
+      <div style="text-align:right">
+        <div class="cr-summary-val">${fmt(grandTotal)} <span style="font-size:11px;font-weight:600;opacity:.8">(VAT 별도)</span></div>
+        <div style="font-size:13px;font-weight:700;color:#ffe08a;margin-top:2px;font-family:'DM Mono',monospace">${fmt(Math.round(grandTotal*1.1))} <span style="font-size:10px;font-weight:600;opacity:.85">(VAT 포함)</span></div>
+      </div>
     </div>
+    ${_hasAdj ? `
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <div style="flex:1;background:#f0f3f8;border:1px solid #d5deea;border-radius:6px;padding:7px 11px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:#5a6b8a;font-weight:600">🏭 제작 원가 <span style="font-size:10px;color:#8a97ac">(조정 0%)</span></span>
+        <span style="text-align:right">
+          <span style="font-size:14px;font-weight:800;color:#2c3e50;font-family:'DM Mono',monospace">${fmt(costGrand)} <span style="font-size:10px;font-weight:600;color:#8a97ac">별도</span></span><br>
+          <span style="font-size:12px;font-weight:700;color:#4a5a72;font-family:'DM Mono',monospace">${fmt(Math.round(costGrand*1.1))} <span style="font-size:9px;font-weight:600;color:#8a97ac">VAT 포함</span></span>
+        </span>
+      </div>
+      <div style="flex:1;background:${adjDiff>0?'#fdeeee':'#eafaf1'};border:1px solid ${adjDiff>0?'#f0c0c0':'#b8e6cc'};border-radius:6px;padding:7px 11px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:${_diffColor};font-weight:600">📈 원가 대비 차액</span>
+        <span style="text-align:right">
+          <span style="font-size:14px;font-weight:800;color:${_diffColor};font-family:'DM Mono',monospace">${_diffSign}${fmt(adjDiff)} <span style="font-size:11px">(${_diffSign}${adjPct.toFixed(1)}%)</span> <span style="font-size:10px;font-weight:600;opacity:.75">별도</span></span><br>
+          <span style="font-size:12px;font-weight:700;color:${_diffColor};font-family:'DM Mono',monospace;opacity:.9">${_diffSign}${fmt(Math.round(adjDiff*1.1))} <span style="font-size:9px;font-weight:600;opacity:.75">VAT 포함</span></span>
+        </span>
+      </div>
+    </div>` : ''}
     ${itemBlocks}
-    <div style="margin-top:10px;font-size:10px;color:#888">※ 금액은 공급가 기준 (VAT 별도) · 로스율은 각 항목에 이미 반영됨</div>
+    <div style="margin-top:10px;font-size:10px;color:#888">※ 상단 합계에 공급가(VAT 별도)와 VAT 포함가를 함께 표기 · 개별 항목 금액은 VAT 별도 · 로스율은 각 항목에 이미 반영됨</div>
   </div>`;
 }
 
@@ -12059,9 +12066,10 @@ function buildMaterialSummaryHTML(){
   const totalQty = orderItems.reduce((s,i)=>i.cancelled?s:s+(i.qty||1),0);
   
   // adjItemTotal과 동일한 로직: 조정률/제외 적용
-  function adjCost(cost, key, qty){
+  function adjCost(cost, key, qty, ignoreRate){
     if(adjExclude[key]) return 0;
-    return (cost||0) * (qty||1) * (1 + (adjRates[key]||0)/100);
+    const rate = ignoreRate ? 0 : (adjRates[key]||0);
+    return (cost||0) * (qty||1) * (1 + rate/100);
   }
   
   // 자재별 합산 (조정률 반영)
@@ -12136,6 +12144,13 @@ function buildMaterialSummaryHTML(){
   ];
   
   const grandTotal = rows.reduce((s,r)=>s+r.val, 0);
+  // ★ 제작 원가(증감% 0% 기준, 제외 X 반영) 합계와 조정 차액
+  const msCostGrand = orderItems.reduce((s,i)=>i.cancelled ? s : (s+calcItemCostTotal(i)), 0);
+  const msAdjDiff = grandTotal - msCostGrand;
+  const msAdjPct = msCostGrand ? (msAdjDiff / msCostGrand * 100) : 0;
+  const _msHasAdj = Math.abs(msAdjDiff) >= 1;
+  const _msDiffColor = msAdjDiff > 0 ? '#c0392b' : '#1a8050';
+  const _msDiffSign = msAdjDiff > 0 ? '+' : '';
   
   // 값이 0이 아닌 것만 표시
   const visibleRows = rows.filter(r => r.val > 0);
@@ -12207,18 +12222,38 @@ function buildMaterialSummaryHTML(){
   <div class="ms-wrap">
     <div class="ms-hdr">
       <div>
-        <div class="ms-title">📊 현장 자재 합계</div>
+        <div class="ms-title">📊 원가비교 (자재합계)</div>
         <div class="ms-meta">Decco | ${site}${company?` (${company})`:''} | ${today} | 총 ${orderItems.length}종 ${totalQty} set</div>
       </div>
       ${_siteColorBar()}
     </div>
     <div class="ms-summary-card">
       <div>
-        <div class="ms-summary-label">📦 자재 합계 (공급가)</div>
+        <div class="ms-summary-label">📦 자재 합계 (공급가)${_msHasAdj?' <span style="font-size:10px;opacity:.85">· 조정 반영</span>':''}</div>
         <div style="font-size:10px;opacity:.8;margin-top:2px">${visibleRows.length}개 자재 항목 합산</div>
       </div>
-      <div class="ms-summary-val">${fmt(grandTotal)}원</div>
+      <div style="text-align:right">
+        <div class="ms-summary-val">${fmt(grandTotal)}원 <span style="font-size:12px;font-weight:600;opacity:.85">(VAT 별도)</span></div>
+        <div style="font-size:15px;font-weight:800;opacity:.95;margin-top:3px;font-family:'DM Mono',monospace">${fmt(Math.round(grandTotal*1.1))}원 <span style="font-size:11px;font-weight:600;opacity:.85">(VAT 포함)</span></div>
+      </div>
     </div>
+    ${_msHasAdj ? `
+    <div style="display:flex;gap:8px;margin:8px 0 4px">
+      <div style="flex:1;background:#f0f3f8;border:1px solid #d5deea;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:#5a6b8a;font-weight:600">🏭 제작 원가 <span style="font-size:10px;color:#8a97ac">(조정 0%)</span></span>
+        <span style="text-align:right">
+          <span style="font-size:15px;font-weight:800;color:#2c3e50;font-family:'DM Mono',monospace">${fmt(msCostGrand)}원 <span style="font-size:10px;font-weight:600;color:#8a97ac">별도</span></span><br>
+          <span style="font-size:12px;font-weight:700;color:#4a5a72;font-family:'DM Mono',monospace">${fmt(Math.round(msCostGrand*1.1))}원 <span style="font-size:9px;font-weight:600;color:#8a97ac">VAT 포함</span></span>
+        </span>
+      </div>
+      <div style="flex:1;background:${msAdjDiff>0?'#fdeeee':'#eafaf1'};border:1px solid ${msAdjDiff>0?'#f0c0c0':'#b8e6cc'};border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:${_msDiffColor};font-weight:600">📈 원가 대비 차액</span>
+        <span style="text-align:right">
+          <span style="font-size:15px;font-weight:800;color:${_msDiffColor};font-family:'DM Mono',monospace">${_msDiffSign}${fmt(msAdjDiff)}원 <span style="font-size:11px">(${_msDiffSign}${msAdjPct.toFixed(1)}%)</span> <span style="font-size:10px;font-weight:600;opacity:.75">별도</span></span><br>
+          <span style="font-size:12px;font-weight:700;color:${_msDiffColor};font-family:'DM Mono',monospace;opacity:.9">${_msDiffSign}${fmt(Math.round(msAdjDiff*1.1))}원 <span style="font-size:9px;font-weight:600;opacity:.75">VAT 포함</span></span>
+        </span>
+      </div>
+    </div>` : ''}
     <table class="ms-table">
       <thead>
         <tr>
@@ -12232,14 +12267,19 @@ function buildMaterialSummaryHTML(){
       </tbody>
       <tfoot>
         <tr>
-          <td style="padding:10px;border:1px solid #c5d0e0;background:#1a2340;color:#fff;font-weight:700;font-size:13px">📊 총 합계</td>
+          <td style="padding:10px;border:1px solid #c5d0e0;background:#1a2340;color:#fff;font-weight:700;font-size:13px">📊 총 합계 <span style="font-size:10px;font-weight:500;opacity:.8">(VAT 별도)</span></td>
           <td style="padding:10px;border:1px solid #c5d0e0;background:#1a2340;color:#fff;text-align:right;font-family:'DM Mono',monospace;font-weight:900;font-size:15px">${fmt(grandTotal)}원</td>
           <td style="padding:10px;border:1px solid #c5d0e0;background:#1a2340;color:#fff;text-align:right;font-family:'DM Mono',monospace;font-size:11px">100.0%</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px;border:1px solid #c5d0e0;background:#2c3e6a;color:#ffe08a;font-weight:700;font-size:12px">💰 VAT 포함가</td>
+          <td style="padding:8px 10px;border:1px solid #c5d0e0;background:#2c3e6a;color:#ffe08a;text-align:right;font-family:'DM Mono',monospace;font-weight:900;font-size:14px">${fmt(Math.round(grandTotal*1.1))}원</td>
+          <td style="padding:8px 10px;border:1px solid #c5d0e0;background:#2c3e6a;color:#ffe08a;text-align:right;font-family:'DM Mono',monospace;font-size:11px">110.0%</td>
         </tr>
       </tfoot>
     </table>
     <div style="font-size:10px;color:#888;margin-top:8px;line-height:1.5">
-      ※ 금액은 공급가 기준 (VAT 별도) · 단가 조정률 / 제외 항목 반영됨<br>
+      ※ 상단·하단 합계에 공급가(VAT 별도)와 VAT 포함가를 함께 표기 · 단가 조정률 / 제외 항목 반영됨<br>
       ※ 값이 0인 자재 항목은 표시되지 않습니다
     </div>
   </div>`;
@@ -12266,11 +12306,11 @@ async function printCostReview(){
   const h = buildCostReviewHTML();
   if(!h){alert('견적 목록이 없습니다.');return}
   const w = window.open('','_blank','width=1000,height=800');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가 검토</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>계산 검토</title>
 <style>body{margin:0;font-family:'Malgun Gothic',sans-serif;background:#f0f3f8}@media print{@page{size:A4;margin:10mm}body{background:#fff} .no-print{display:none !important}}</style>
 </head><body>
   <div class="no-print" style="position:sticky;top:0;background:#1a2a50;color:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;z-index:1000;box-shadow:0 2px 6px rgba(0,0,0,.2)">
-    <span style="font-size:12px;font-weight:600">🔍 원가 검토 — 각 창호의 [🔧 BOM] 버튼으로 Winkhaus 하드웨어 BOM 확인</span>
+    <span style="font-size:12px;font-weight:600">🔍 계산 검토 — 각 창호의 [🔧 BOM] 버튼으로 Winkhaus 하드웨어 BOM 확인</span>
     <button onclick="window.print()" style="background:#fff;color:#1a2a50;border:none;padding:5px 14px;border-radius:5px;cursor:pointer;font-weight:700;font-size:12px">🖨 인쇄</button>
   </div>
   ${h}
@@ -12306,15 +12346,9 @@ function printQuote(){
   const today = new Date().toLocaleDateString('ko-KR');
 
   // 조정률 적용 단가 계산
-  function adjItemTotal(item){
-    const q=item.qty;
-    function a(cost,key){ return adjExclude[key]?0:(cost||0)*q*(1+(adjRates[key]||0)/100); }
-    return a(item.profileCost,'profile')+a(item.reinfCost,'reinf')+a(item.glassCost,'glass')
-          +a(item.gbCost,'gb')+a(item.couplCost,'coupl')+a(item.railCost,'rail')
-          +a(item.screenCost,'screen')+a(item.addonCost,'addon')+a(item.nailCost,'nail')
-          +a(item.windCost,'wind')+a(item.expBandCost,'expBand')+a(item.angle90Cost,'angle90')+a(item.flashingCost,'flashing')
-          +a(item.tapingCost,'taping')+a(item.laborCost,'labor');
-  }
+  // ★ 견적서·엑셀도 원가검토와 동일하게 breakdownRows 기준으로 계산 (세 곳 값 일치)
+  //    breakdownRows가 없는 구버전 항목은 공용 함수가 grandTotal로 폴백한다.
+  function adjItemTotal(item){ return calcItemSupplyTotal(item); }
 
   const manualTotal  = manualAdjs.reduce((s,i)=>s+(parseFloat(i.amount)||0),0) + getFixedTotal();
   const roundingAdj  = Math.max(0, parseFloat(document.getElementById('rounding-adj')?.value)||0);
@@ -12343,19 +12377,22 @@ function printQuote(){
     return wSum > 0 ? bSum / wSum : 1;
   }
 
-  // 백색 항목을 블랙으로 변환 (profileCost만 배율 적용)
+  // 백색 항목을 블랙으로 변환 (profileCost + breakdownRows 프로파일 행 배율 적용)
   function toBlackItem(item){
     const ratio = blackRatio(item.frame, item.sash);
-    return Object.assign({}, item, {
+    const scaled = _scaleProfileInBreakdown(item, ratio);
+    return Object.assign({}, scaled, {
       profileCost: (item.profileCost||0) * ratio,
       color: '블랙',
     });
   }
 
-  // 블랙 항목을 백색으로 환산 (profileCost 역배율 적용) — A 페이지에 모든 창호 백색 가격 표시용
+  // 블랙 항목을 백색으로 환산 (profileCost + breakdownRows 프로파일 행 역배율) — A 페이지에 모든 창호 백색 가격 표시용
   function toWhiteItem(item){
     const ratio = blackRatio(item.frame, item.sash);
-    return Object.assign({}, item, {
+    const inv = ratio > 0 ? 1/ratio : 1;
+    const scaled = _scaleProfileInBreakdown(item, inv);
+    return Object.assign({}, scaled, {
       profileCost: ratio > 0 ? (item.profileCost||0) / ratio : (item.profileCost||0),
       color: '화이트',
     });
@@ -12760,15 +12797,9 @@ function printQuoteWithSVG(){
   const fmtW = v => '₩' + fmt(v);
   const today = new Date().toLocaleDateString('ko-KR');
 
-  function adjItemTotal(item){
-    const q=item.qty;
-    function a(cost,key){ return adjExclude[key]?0:(cost||0)*q*(1+(adjRates[key]||0)/100); }
-    return a(item.profileCost,'profile')+a(item.reinfCost,'reinf')+a(item.glassCost,'glass')
-          +a(item.gbCost,'gb')+a(item.couplCost,'coupl')+a(item.railCost,'rail')
-          +a(item.screenCost,'screen')+a(item.addonCost,'addon')+a(item.nailCost,'nail')
-          +a(item.windCost,'wind')+a(item.expBandCost,'expBand')+a(item.angle90Cost,'angle90')+a(item.flashingCost,'flashing')
-          +a(item.tapingCost,'taping')+a(item.laborCost,'labor');
-  }
+  // ★ 견적서·엑셀도 원가검토와 동일하게 breakdownRows 기준으로 계산 (세 곳 값 일치)
+  //    breakdownRows가 없는 구버전 항목은 공용 함수가 grandTotal로 폴백한다.
+  function adjItemTotal(item){ return calcItemSupplyTotal(item); }
 
   function blackRatio(frameKey, sashKey){
     const frameW={'F84':P('F84w'),'F70':P('F70w')}[frameKey]||P('F70w');
@@ -12779,11 +12810,15 @@ function printQuoteWithSVG(){
     return wSum>0?bSum/wSum:1;
   }
   function toBlackItem(item){
-    return Object.assign({},item,{profileCost:(item.profileCost||0)*blackRatio(item.frame,item.sash),color:'블랙'});
+    const ratio = blackRatio(item.frame, item.sash);
+    const scaled = _scaleProfileInBreakdown(item, ratio);
+    return Object.assign({}, scaled, {profileCost:(item.profileCost||0)*ratio, color:'블랙'});
   }
   function toWhiteItem(item){
     const ratio = blackRatio(item.frame, item.sash);
-    return Object.assign({},item,{profileCost: ratio>0 ? (item.profileCost||0)/ratio : (item.profileCost||0), color:'화이트'});
+    const inv = ratio > 0 ? 1/ratio : 1;
+    const scaled = _scaleProfileInBreakdown(item, inv);
+    return Object.assign({}, scaled, {profileCost: ratio>0 ? (item.profileCost||0)/ratio : (item.profileCost||0), color:'화이트'});
   }
 
   const manualTotal = manualAdjs.reduce((s,i)=>s+(parseFloat(i.amount)||0),0)+getFixedTotal();
@@ -14550,25 +14585,8 @@ ${(()=>{
 
 function exportCSV(){
   if(!orderItems.length){alert('견적 목록이 없습니다.');return}
-  function adjItemTotal(item){
-    const q=item.qty;
-    function a(cost,key){ return adjExclude[key] ? 0 : (cost||0)*q*(1+adjRates[key]/100); }
-    return a(item.profileCost,  'profile')
-         + a(item.reinfCost,    'reinf')
-         + a(item.glassCost,    'glass')
-         + a(item.gbCost,       'gb')
-         + a(item.couplCost,    'coupl')
-         + a(item.railCost,     'rail')
-         + a(item.screenCost,   'screen')
-         + a(item.addonCost,    'addon')
-         + a(item.nailCost,     'nail')
-         + a(item.windCost,     'wind')
-         + a(item.expBandCost,  'expBand')
-         + a(item.angle90Cost,  'angle90')
-         + a(item.flashingCost, 'flashing')
-         + a(item.tapingCost,   'taping')
-         + a(item.laborCost,    'labor');
-  }
+  // ★ 엑셀/CSV도 원가검토와 동일 기준 (breakdownRows) — 세 곳 값 일치
+  function adjItemTotal(item){ return calcItemSupplyTotal(item); }
   const h=['번호','업체','현장','부호','위치','TYPE','타입','너비','높이','색상','프레임','샤시','구성','수량','단가(조정후)','금액(조정후)'];
   const rows=orderItems.map((it,i)=>{
     const adjTotal=adjItemTotal(it);
@@ -14689,6 +14707,115 @@ function _getSchedMeta(){
 function _setSchedMeta(m){
   m = m || {};
   _schedInfo = m.info || null;
+}
+
+// ── 항목별 공급가 계산 (제외/증감% 반영) — 화면 합계·원가검토·견적서 공용 ──
+// breakdownRows(상세 내역)를 기준으로 계산해 세 곳의 값이 항상 일치하게 한다.
+function _adjCatKey(label){
+  const s = String(label||'');
+  if(s.includes('보강재')) return 'reinf';
+  if(s.includes('프레임')) return 'profile';
+  if(s.includes('샤시'))   return 'profile';
+  if(s.includes('중간바')) return 'profile';
+  if(s.includes('유리'))   return 'glass';
+  if(s.includes('GB'))     return 'gb';
+  if(s.includes('커플링') || s.includes('커플러')) return 'coupl';
+  if(s.includes('하드웨어') || s.includes('레일')) return 'rail';
+  if(s.includes('방충망')) return 'screen';
+  if(s.includes('연장바') || s.includes('덧바')) return 'addon';
+  if(s.includes('네일핀')) return 'nail';
+  if(s.includes('풍압'))   return 'wind';
+  if(s.includes('직각'))   return 'angle90';
+  if(s.includes('후레슁')) return 'flashing';
+  if(s.includes('기밀'))   return 'taping';
+  if(s.includes('공임'))   return 'labor';
+  return null;
+}
+// 한 창호의 조정 후 공급가(총액, qty 반영). breakdownRows 없으면 grandTotal 폴백.
+// ignoreRate=true 이면 증감%를 무시한 '제작 원가' 계산 (제외 X는 그대로 반영)
+function calcItemSupplyTotal(item, ignoreRate){
+  const rows = (item && item.breakdownRows) || [];
+  if(!rows.length) return (item && item.grandTotal) || 0;
+  let unit = 0;
+  rows.forEach(b => {
+    const cat  = _adjCatKey(b.label);
+    const excl = cat && adjExclude && adjExclude[cat];
+    const rate = ignoreRate ? 0 : ((cat && adjRates && adjRates[cat]) || 0);
+    if(!excl) unit += (b.val||0) * (1 + rate/100);
+  });
+  return Math.round(unit) * ((item && item.qty) || 1);
+}
+// 한 창호의 제작 원가(증감% 0% 기준, 제외 X는 반영)
+function calcItemCostTotal(item){ return calcItemSupplyTotal(item, true); }
+// 색상 변환 시 breakdownRows의 프로파일(프레임/샤시/중간바) 행에 배율을 곱해 사본을 만든다.
+// (합계가 breakdownRows 기준으로 계산되므로, 색상별 A/B 견적은 이 배율이 반영돼야 값이 달라진다)
+function _scaleProfileInBreakdown(item, ratio){
+  const rows = item && item.breakdownRows;
+  if(!Array.isArray(rows) || !(ratio > 0) || ratio === 1) return item;
+  const newRows = rows.map(b => {
+    return (_adjCatKey(b.label) === 'profile')
+      ? Object.assign({}, b, { val: (b.val || 0) * ratio })
+      : b;
+  });
+  return Object.assign({}, item, { breakdownRows: newRows });
+}
+// 전체 공급가 합계 (취소 창호 제외, 제외·증감% 반영) — 수동/고정조정 미포함
+function calcSupplyGrand(){
+  return (orderItems||[]).reduce((s,i)=> i.cancelled ? s : (s + calcItemSupplyTotal(i)), 0);
+}
+// 전체 제작 원가 합계 (증감% 0% 기준, 제외 X 반영)
+function calcCostGrand(){
+  return (orderItems||[]).reduce((s,i)=> i.cancelled ? s : (s + calcItemCostTotal(i)), 0);
+}
+
+// ── 단가 조정 상태(제외/증감%/수동조정/고정조정) 저장·복원 ──
+// 저장 파일에 포함해 프로젝트를 다시 열어도 X 제외·% 조정이 유지되게 한다
+function _getAdjState(){
+  return {
+    exclude: Object.assign({}, adjExclude),
+    rates:   Object.assign({}, adjRates),
+    manual:  (typeof _adjExclManual!=='undefined') ? Object.assign({}, _adjExclManual) : undefined,
+    manualAdjs: Array.isArray(manualAdjs) ? JSON.parse(JSON.stringify(manualAdjs)) : [],
+    fixedTransport: document.getElementById('fixed-transport')?.value || '',
+    fixedLabor:     document.getElementById('fixed-labor')?.value || ''
+  };
+}
+function _setAdjState(a){
+  if(!a || typeof a!=='object') return;
+  // 제외/증감%: 알려진 키만 반영
+  if(a.exclude && typeof a.exclude==='object'){
+    ADJ_KEYS.forEach(k=>{ adjExclude[k] = !!a.exclude[k]; });
+  }
+  if(a.rates && typeof a.rates==='object'){
+    ADJ_KEYS.forEach(k=>{ adjRates[k] = Number(a.rates[k])||0; });
+  }
+  if(a.manual && typeof a.manual==='object' && typeof _adjExclManual!=='undefined'){
+    Object.keys(_adjExclManual).forEach(k=>{ _adjExclManual[k] = !!a.manual[k]; });
+  }
+  if(Array.isArray(a.manualAdjs) && typeof manualAdjs!=='undefined'){
+    manualAdjs.length = 0;
+    a.manualAdjs.forEach(x=>manualAdjs.push(x));
+  }
+  const ft=document.getElementById('fixed-transport'); if(ft) ft.value = a.fixedTransport||'';
+  const fl=document.getElementById('fixed-labor');     if(fl) fl.value = a.fixedLabor||'';
+  // 조정 슬라이더/버튼 UI를 복원값에 맞춰 다시 그림 (resetAllAdj와 동일한 방식)
+  [...ADJ_KEYS,'all'].forEach(k=>{
+    const rate = (k==='all') ? 0 : (adjRates[k]||0);
+    const excl = (k==='all') ? false : !!adjExclude[k];
+    const sl=document.getElementById('adj-'+k+'-slider');
+    const pc=document.getElementById('adj-'+k+'-pct');
+    const bt=document.getElementById('adj-'+k+'-excl');
+    const row=bt?.closest('.adj-row');
+    if(sl) sl.value = rate;
+    if(pc){ pc.value = rate; pc.className='adj-pct'+(rate>0?' up':rate<0?' dn':''); pc.disabled = excl; }
+    if(bt){ bt.classList.toggle('excluded', excl); bt.title = excl ? '제외 해제' : '견적에서 제외'; }
+    if(row) row.classList.toggle('excluded-row', excl);
+  });
+  // 수동 조정 리스트 UI 갱신 (있으면)
+  try{ if(typeof updateFixedAdj==='function') updateFixedAdj(); }catch(_){}
+  if(typeof renderManualAdjList==='function'){ try{ renderManualAdjList(); }catch(_){} }
+  else if(typeof drawManualAdjs==='function'){ try{ drawManualAdjs(); }catch(_){} }
+  try{ if(typeof updateAdj==='function') updateAdj(); }catch(_){}
 }
 
 async function printWindowSchedule(opts){
@@ -17171,7 +17298,10 @@ function updateAdj(){
 
   // 조정 후 합계 (% 조정 + 수동 조정)
   const totalAdj = adjTotal + manualTotal;
-  const finalGrand = baseTotal + totalAdj;
+  // ★ 조정 후 공급가는 원가검토·견적서와 동일하게 breakdownRows 기준으로 계산 (세 곳 값 일치)
+  //    항목별 델타(위 adjXxx)는 표시용으로 유지하고, 최종 합계만 정확한 값으로 확정한다.
+  const supplyGrand = calcSupplyGrand();
+  const finalGrand = supplyGrand + manualTotal;
   const grandEl = document.getElementById('adj-grand-total');
   if(grandEl) grandEl.textContent = fmt(finalGrand);
   const vatEl = document.getElementById('adj-grand-vat');
@@ -17278,6 +17408,7 @@ function autosave(){
       // 일람표 공란 위치 (창호일람표에서만 사용)
       scheduleBlanks: _scheduleBlankList(),
       schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
+      adjState: _getAdjState(),   // 단가 조정(제외/증감%/수동조정) 상태
       // 프로젝트 전역 설정
       hwType: _hwType,
       hwEurRate: _hwEurRate,
@@ -17387,6 +17518,7 @@ function tryAutorestore(){
       // 일람표 공란 복원 (없으면 비움 — 다른 견적과 섞이지 않도록)
       _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
       _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
+      _setAdjState(data && data.adjState);   // 단가 조정 상태 복원
       // 프로젝트 전역 설정 복원
       if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
         _hwEurRate = data.hwEurRate;
@@ -17429,6 +17561,7 @@ function saveProject(){
     // 일람표 공란 위치 (창호일람표에서만 사용)
     scheduleBlanks: _scheduleBlankList(),
     schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
+    adjState: _getAdjState(),   // 단가 조정(제외/증감%/수동조정) 상태
     // 프로젝트 전역 설정
     hwType: _hwType,
     hwEurRate: _hwEurRate,
@@ -17491,6 +17624,7 @@ function loadProject(event){
         // 일람표 공란 복원 (없으면 비움)
         _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
         _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
+        _setAdjState(data && data.adjState);   // 단가 조정 상태 복원
         // 교체 모드일 때만 프로젝트 전역 설정도 같이 복원
         if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
           _hwEurRate = data.hwEurRate;
@@ -17646,6 +17780,7 @@ async function saveToCloud(){
     orderCnt,
     scheduleBlanks: _scheduleBlankList(),
     schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
+    adjState: _getAdjState(),   // 단가 조정(제외/증감%/수동조정) 상태
     hwType: _hwType,
     hwEurRate: _hwEurRate,
     doorType: _doorType
@@ -19953,6 +20088,7 @@ async function loadFromCloud(projectId){
     // 일람표 공란 복원 (없으면 비움 — 다른 프로젝트와 섞이지 않도록)
     _setScheduleBlankList(Array.isArray(data.scheduleBlanks) ? data.scheduleBlanks : []);
     _setSchedMeta(data.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
+    _setAdjState(data && data.adjState);   // 단가 조정 상태 복원
 
     // 전역 설정 복원
     if(typeof data.hwEurRate === 'number' && data.hwEurRate > 0){
@@ -21824,6 +21960,7 @@ async function saveCloudAutosave(){
     orderCnt,
     scheduleBlanks: _scheduleBlankList(),
     schedMeta: _getSchedMeta(),   // 일람표 우측상단 수동입력 (현장별)
+    adjState: _getAdjState(),   // 단가 조정(제외/증감%/수동조정) 상태
     hwType: _hwType,
     hwEurRate: _hwEurRate,
     doorType: _doorType
@@ -21891,6 +22028,7 @@ async function restoreFromCloudAutosave(){
     // 일람표 공란 복원 (없으면 비움)
     _setScheduleBlankList(Array.isArray(cloudData.scheduleBlanks) ? cloudData.scheduleBlanks : []);
     _setSchedMeta(cloudData.schedMeta);   // 일람표 우측상단 수동입력 (현장별)
+    _setAdjState(cloudData && cloudData.adjState);   // 단가 조정 상태 복원
 
     if(typeof cloudData.hwEurRate === 'number') _hwEurRate = cloudData.hwEurRate;
     if(cloudData.hwType && typeof setHwType === 'function') setHwType(cloudData.hwType);
