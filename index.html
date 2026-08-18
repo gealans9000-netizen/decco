@@ -4341,6 +4341,11 @@ function rebuildCellTypes(nV,nH,force){
           const nm2=cellMerge[rr][c+cs];
           if((nm2&&nm2.hidden)||(cellTypes[rr]&&cellTypes[rr][c+cs])!=='FIX'){canMergeRight=false;break;}
         }
+        const nbR=cellMerge[r][c+cs];
+        if(canMergeRight && nbR){
+          if(((nbR.rowspan)||1)!==rs) canMergeRight=false;
+          else if(c+cs+((nbR.colspan)||1) > cols) canMergeRight=false;
+        }
       }
       // 세로 병합 가능 여부: rowspan 범위 아래 다음 행이 존재하고, colspan 내 모든 열에서 해당 행이 FIX이고 hidden이 아님
       let canMergeDown = ct==='FIX' && r+rs<rows;
@@ -4348,6 +4353,11 @@ function rebuildCellTypes(nV,nH,force){
         for(let cc=c;cc<c+cs;cc++){
           const nm2=cellMerge[r+rs]&&cellMerge[r+rs][cc];
           if((nm2&&nm2.hidden)||(cellTypes[r+rs]&&cellTypes[r+rs][cc])!=='FIX'){canMergeDown=false;break;}
+        }
+        const nbD=cellMerge[r+rs]&&cellMerge[r+rs][c];
+        if(canMergeDown && nbD){
+          if(((nbD.colspan)||1)!==cs) canMergeDown=false;
+          else if(r+rs+((nbD.rowspan)||1) > rows) canMergeDown=false;
         }
       }
       // 병합 해제 가능 여부
@@ -4408,18 +4418,30 @@ function mergeCells(r,c,dir){
   const rs=(m.rowspan)||1;
   if(dir==='right'){
     if(c+cs>=cols) return;
-    // 오른쪽 셀이 병합 셀의 오른쪽 전체를 포함하는지 확인
-    // 단순화: colspan 1씩 확장, 해당 열의 모든 행(rowspan 내) 숨김
-    for(let rr=r;rr<r+rs;rr++){
-      cellMerge[rr][c+cs]={hidden:true};
+    // 합칠 오른쪽 이웃이 이미 병합 셀이면 그 폭(colspan)을 흡수해야 한다.
+    // (그러지 않으면 이웃의 병합이 풀려 셀 하나가 도면에서 빠지는 버그 발생)
+    const nb = cellMerge[r][c+cs] || {};
+    const addCs = (nb.colspan) || 1;
+    if(c+cs+addCs > cols) return;               // 범위 초과 방지
+    if(((nb.rowspan)||1) !== rs) return;        // rowspan이 같아야 안전
+    for(let rr=r; rr<r+rs; rr++){
+      for(let cc=c+cs; cc<c+cs+addCs; cc++){
+        cellMerge[rr][cc] = {hidden:true};
+      }
     }
-    cellMerge[r][c]={colspan:cs+1,rowspan:rs};
+    cellMerge[r][c] = {colspan: cs+addCs, rowspan: rs};
   } else if(dir==='down'){
     if(r+rs>=rows) return;
-    for(let cc=c;cc<c+cs;cc++){
-      cellMerge[r+rs][cc]={hidden:true};
+    const nb = cellMerge[r+rs][c] || {};
+    const addRs = (nb.rowspan) || 1;
+    if(r+rs+addRs > rows) return;
+    if(((nb.colspan)||1) !== cs) return;        // colspan이 같아야 안전
+    for(let cc=c; cc<c+cs; cc++){
+      for(let rr=r+rs; rr<r+rs+addRs; rr++){
+        cellMerge[rr][cc] = {hidden:true};
+      }
     }
-    cellMerge[r][c]={colspan:cs,rowspan:rs+1};
+    cellMerge[r][c] = {colspan: cs, rowspan: rs+addRs};
   }
   rebuildCellTypes(nV,nH,null);
   update();
@@ -4674,20 +4696,22 @@ function computeGeom(W,H,nV,nH){
         let leftIsTT = false, leftCellW = 0, leftCellLMW = 0;
         let rightIsTT = false, rightCellW = 0, rightCellRMW = 0;
         if(ct === 'TT'){
-          // 좌측 인접 셀
+          // 좌측 인접 셀 — 사이 중간바가 M64(샤시에 직접 부착)일 때만 양개
           if(c > 0){
             const leftCT = (cellTypes[r] && cellTypes[r][c-1]) || effBase;
-            if(isTTLikeCell(leftCT)){
+            const leftMulIsM64 = getVMulType(c-1) === 'M64';
+            if(isTTLikeCell(leftCT) && leftMulIsM64){
               leftIsTT = true;
               leftCellW = vPos[c] - vPos[c-1];
               // 양개 왼쪽 셀(c-1)의 좌측 장애물: 첫 셀이면 fw, 아니면 그 좌측 중간바/2
               leftCellLMW = (c-1 === 0) ? fw : _vMulW(c-2)/2;
             }
           }
-          // 우측 인접 셀
+          // 우측 인접 셀 — 사이 중간바가 M64일 때만 양개
           if((c+cs) < cols){
             const rightCT = (cellTypes[r] && cellTypes[r][c+cs]) || effBase;
-            if(isTTLikeCell(rightCT)){
+            const rightMulIsM64 = getVMulType(c+cs-1) === 'M64';
+            if(isTTLikeCell(rightCT) && rightMulIsM64){
               rightIsTT = true;
               rightCellW = vPos[c+cs+1] - vPos[c+cs];
               // 양개 오른쪽 셀(c+cs)의 우측 장애물: 마지막 셀이면 fw, 아니면 그 우측 중간바/2
@@ -7694,7 +7718,8 @@ function buildCutTable(W,H,g,ci){
       if(c.ct === 'TT'){
         if(cc > 0){
           const leftCT = (cellTypes[r] && cellTypes[r][cc-1]) || c.ct;
-          if(isTTLikeCell(leftCT)){
+          const leftMulIsM64 = getVMulType(cc-1) === 'M64';
+          if(isTTLikeCell(leftCT) && leftMulIsM64){
             leftIsTT = true;
             leftCellW = g.vPos[cc] - g.vPos[cc-1];
             leftCellLMW = (cc-1 === 0) ? fwVal : mullionWidth(getVMulType(cc-2))/2;
@@ -7702,7 +7727,8 @@ function buildCutTable(W,H,g,ci){
         }
         if(cc+1 < cols){
           const rightCT = (cellTypes[r] && cellTypes[r][cc+1]) || c.ct;
-          if(isTTLikeCell(rightCT)){
+          const rightMulIsM64 = getVMulType(cc) === 'M64';
+          if(isTTLikeCell(rightCT) && rightMulIsM64){
             rightIsTT = true;
             rightCellW = g.vPos[cc+2] - g.vPos[cc+1];
             rightCellRMW = (cc+1 === cols-1) ? fwVal : mullionWidth(getVMulType(cc+1))/2;
