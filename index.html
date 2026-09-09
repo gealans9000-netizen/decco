@@ -685,7 +685,7 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
         </select>
       </div>
       <div class="fg"><label class="lbl">중간바</label>
-        <select id="mullionType" onchange="update()">
+        <select id="mullionType" onchange="onMullionTypeChange()">
           <option value="M92">M99</option>
           <option value="M108">M99+</option>
           <option value="M64">M81</option>
@@ -4175,6 +4175,21 @@ function buildMullionInputs(wId,n,pfx,total){
   }
   wrap.innerHTML=h;
   attachMullionPosEnter(pfx, n, total);
+}
+
+// 전역 '중간바' 드롭다운 변경 — 이미 배정된 모든 중간바에 새 타입을 반영한다.
+// update()의 배열 채우기 로직은 "빈 슬롯"만 채우므로(기존 선택 보존), 이 함수가 없으면
+// 드롭다운만 M108로 바뀌고 vMulTypes/hMulTypes는 M92로 남아
+// 창호 Spec의 라벨·샤시W·유리·절단 계산이 전부 옛 타입으로 나오는 문제가 있었다.
+// ※ 양개T/T(TTTT)·양개T/S(TSTS)는 중간바 타입이 구조적으로 고정(M64/M92)이므로 제외.
+//    개별 중간바는 '치수' 섹션의 바별 셀렉트로 변경 후에도 그대로 유지된다.
+function onMullionTypeChange(){
+  const t=document.getElementById('mullionType')?.value;
+  if(t && baseType!=='TTTT' && baseType!=='TSTS'){
+    for(let i=0;i<vMulTypes.length;i++) vMulTypes[i]=t;
+    for(let i=0;i<hMulTypes.length;i++) hMulTypes[i]=t;
+  }
+  update();
 }
 
 function onMulTypeChange(pfx, i, val){
