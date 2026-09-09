@@ -4651,6 +4651,40 @@ function computeGeom(W,H,nV,nH){
   const addonLeft=getAddonVal('left');
   const addonRight=getAddonVal('right');
 
+  // ── 좌/우 덧바 차감 ─────────────────────────────
+  // 상/하 덧바는 sashH·gH 공식에서 직접 차감하지만, 좌/우는 중간바가 끼어 있으면
+  // "어느 셀이 줄어들 것인가"를 정해야 하므로 셀 경계(vPos) 자체를 이동시킨다.
+  // 규칙: FIX 셀(열 전체가 FIX)이 있으면 그 열이 좌·우 덧바를 모두 흡수한다.
+  //       오픈(T/S·T/T·도어) 셀은 설계 치수를 그대로 유지해야 하기 때문.
+  //       FIX 열이 없으면 기존처럼 양끝 열이 각각 자기 쪽 덧바를 부담한다.
+  // 예) W=2690, 중간바 1690, [FIX, TS], 좌덧바36·우덧바36
+  //     → 0~36 덧바 | 36~1654 FIX(1618) | 1654~2654 TS(1000) | 2654~2690 덧바
+  if(addonLeft>0 || addonRight>0){
+    const _effBaseAd=(baseType==='TTFIX'||baseType==='TTTT'||baseType==='TSTS')?'TT':baseType;
+    const _fixCols=[];
+    for(let c=0;c<cols;c++){
+      let _allFix=true;
+      for(let r=0;r<rows;r++){
+        const _ct=(cellTypes[r]&&cellTypes[r][c])||_effBaseAd;
+        if(_ct!=='FIX'){ _allFix=false; break; }
+      }
+      if(_allFix) _fixCols.push(c);
+    }
+    const _absorb=new Array(cols).fill(0);
+    if(_fixCols.length){
+      _absorb[_fixCols[0]] += addonLeft;
+      _absorb[_fixCols[_fixCols.length-1]] += addonRight;
+    } else {
+      _absorb[0] += addonLeft;
+      _absorb[cols-1] += addonRight;
+    }
+    const _shifted=[addonLeft];
+    for(let c=0;c<cols;c++){
+      _shifted.push(_shifted[c] + Math.max(0, (vPos[c+1]-vPos[c]) - _absorb[c]));
+    }
+    for(let i=0;i<vPos.length;i++) vPos[i]=_shifted[i];
+  }
+
   // 각 수직/수평 경계의 중간바 폭 (0=프레임, i=i번째 중간바)
   // vBorder[c]: c열 왼쪽 경계 폭 (c=0→fw, c>0→vMulTypes[c-1] 폭)
   function vBorderW(c){ return c===0||c===cols? fw : mullionWidth(getVMulType(c-1)); }
@@ -5118,11 +5152,11 @@ function drawWindow(W,H,g){
       const _hp = getMulPriority()==='H';
       // 왼쪽 경계
       const leftBorder = seg.firstC===0
-        ? g.vPos[0] + g.fw + (g.addonLeft||0)
+        ? g.vPos[0] + g.fw   /* vPos[0]에 좌덧바가 이미 반영됨 */
         : (_hp ? g.vPos[seg.firstC] + g.fw : g.vPos[seg.firstC] + mullionWidth(getVMulType(seg.firstC-1))/2);
       // 오른쪽 경계
       const rightBorder = seg.lastC===g.cols-1
-        ? g.vPos[g.cols] - g.fw - (g.addonRight||0)
+        ? g.vPos[g.cols] - g.fw   /* vPos[cols]에 우덧바가 이미 반영됨 */
         : (_hp ? g.vPos[seg.lastC+1] - g.fw : g.vPos[seg.lastC+1] - mullionWidth(getVMulType(seg.lastC))/2);
       const mulW2 = rightBorder - leftBorder;
       if(mulW2 <= 0) return;
@@ -5408,18 +5442,45 @@ function drawWindow(W,H,g){
 
   // (E) 수직 중간바 분할 치수 — 도면 상단에 배치, 텍스트는 선 아래(도면쪽)
   //     기본 크기 (DIM_FONT) — 좁은 칸에 자동 축소되어 옆 치수와 겹침 방지
+  // 좌/우 덧바가 있으면 덧바 구간도 같은 치수선에 함께 표기한다.
+  //   예) 36 | 1618 | 1000 | 36  → 합계가 전체 W(2690)와 정확히 일치
+  const _adDimCol = '#111111';                       // 좌측 덧바 치수와 동일한 검정
+  const _showAdDim = (hasAddonLeft||hasAddonRight) && !hideAddonColor;
+  // 덧바 구간(36mm)은 폭이 너무 좁아 dimLineH의 자동축소를 타면 글씨가 옆 치수보다
+  // 작아지고 baseline도 어긋난다. 또 구간 한가운데 두면 옆 분할치수와 겹친다.
+  // → tick만 구간에 찍고, 숫자는 도면 바깥쪽(좌측 덧바는 왼쪽 / 우측 덧바는 오른쪽)에
+  //    분할치수와 같은 크기·같은 높이로 배치한다.
+  function dimAddonH(x1,x2,y,label,col,side){
+    const fsize=DIM_FONT;
+    let s='';
+    s+=`<line x1="${x1}" y1="${y}" x2="${x1}" y2="${y+4}" stroke="${col}" stroke-width="1"/>`;
+    s+=`<line x1="${x2}" y1="${y}" x2="${x2}" y2="${y+4}" stroke="${col}" stroke-width="1"/>`;
+    const tx = (side==='left') ? x1 - fsize*0.35 : x2 + fsize*0.35;
+    const anchor = (side==='left') ? 'end' : 'start';
+    s+=`<text x="${tx}" y="${y+fsize*1.0}" text-anchor="${anchor}" font-size="${fsize}" fill="${col}" font-family="Arial,'Helvetica Neue',sans-serif" font-weight="800" letter-spacing="0.5">${label}</text>`;
+    return s;
+  }
+  if(_showAdDim && hasAddonLeft){
+    out+=dimAddonH(px(0), px(g.addonLeft), DIM_BOT_SUB, `${g.addonLeft}`, _adDimCol, 'left');
+  }
   if(g.nV>0){
     for(let c=0;c<g.cols;c++){
       const x0=g.vPos[c], x1=g.vPos[c+1];
       out+=dimLineH(px(x0), px(x1), DIM_BOT_SUB, `${x1-x0}`, DIM_MUL, 4, null, true);
     }
+  } else if(_showAdDim){
+    // 중간바가 없어도 좌/우 덧바를 뺀 순치수는 표기해 준다
+    out+=dimLineH(px(g.vPos[0]), px(g.vPos[g.cols]), DIM_BOT_SUB, `${g.vPos[g.cols]-g.vPos[0]}`, DIM_MUL, 4, null, true);
+  }
+  if(_showAdDim && hasAddonRight){
+    out+=dimAddonH(px(W-g.addonRight), px(W), DIM_BOT_SUB, `${g.addonRight}`, _adDimCol, 'right');
   }
 
   // (A) 전체 가로 W — 도면 상단에 배치, 텍스트는 선 아래(도면쪽), 큰 글씨 +10, 빨간색
   //     중간바가 없으면 (분할치수 없음) 도면에 더 가까이, 있으면 분할치수 위에 위치
   //     색상은 #d92e2e (덧바 빨강 #cc0000과 의도적으로 다른 값 — T/S 덧바 숨김 토글이
   //     덧바 색을 검사해서 일괄 제거하므로 같은 색이면 가로 치수도 제거됨)
-  const _dimBot1 = (g.nV > 0) ? DIM_BOT_1 : DIM_BOT_SUB;
+  const _dimBot1 = (g.nV > 0 || _showAdDim) ? DIM_BOT_1 : DIM_BOT_SUB;
   out+=dimLineH(px(0), px(W), _dimBot1, `${W} mm`, '#d92e2e', 6, DIM_FONT+10, true, DIM_FONT);
 
   // ── 좌측 세로 치수 보조 함수 ──
@@ -7917,9 +7978,13 @@ function buildCutTable(W,H,g,ci){
     // 샤시쪽의 바 위치 길이:
     // handlePos가 'left'이면 샤시가 왼쪽 → 바 위치 = vPos[1] (왼쪽부터 중간바까지)
     // handlePos가 'right'이면 샤시가 오른쪽 → 바 위치 = W - vPos[1] (중간바부터 오른쪽 끝까지)
-    const _vp1 = g.vPos && g.vPos.length > 1 ? g.vPos[1] : Math.round(W / 2);
+    // ※ vPos에는 좌/우 덧바가 반영되어 있으므로 프레임 안쪽 기준으로 측정한다
+    //   (덧바가 없으면 vPos[0]=0, vPos[cols]=W 이므로 기존 계산과 완전히 동일)
+    const _vpL = (g.vPos && g.vPos.length) ? g.vPos[0] : 0;
+    const _vpR = (g.vPos && g.vPos.length) ? g.vPos[g.cols] : W;
+    const _vp1 = g.vPos && g.vPos.length > 1 ? g.vPos[1] : Math.round((_vpL + _vpR) / 2);
     const _tsHandlePos = document.getElementById('handlePos')?.value || 'left';
-    const barPos = (_tsHandlePos === 'right') ? Math.round(W - _vp1) : Math.round(_vp1);
+    const barPos = (_tsHandlePos === 'right') ? Math.round(_vpR - _vp1) : Math.round(_vp1 - _vpL);
 
     // 1)~3) 프레임 레일 공통 로직: 바위치 >= 1100 → frameW−70, < 1100 → 첫 TS샤시W+1000
     const tsCells=ci.sashCells.filter(c=>c.ct==='TS');
