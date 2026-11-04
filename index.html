@@ -215,6 +215,12 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:10px 0}
 .cloud-delete-btn{background:rgba(216,69,69,0.1);border:1px solid rgba(216,69,69,0.25);color:#ff7a76;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer}
 .cloud-delete-btn:hover{background:rgba(216,69,69,0.2);border-color:rgba(216,69,69,0.5)}
 
+.logo-t{white-space:nowrap;flex:none}
+.logo-s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+.series-sw{display:inline-flex;flex:none;white-space:nowrap;margin-left:10px;border:1px solid #3d4358;border-radius:6px;overflow:hidden;vertical-align:middle}
+.series-btn{flex:none;background:#1d2130;color:#b0b8c5;border:none;padding:3px 12px;font-size:12px;font-weight:800;cursor:pointer}
+.series-btn.on{background:#5b8def;color:#fff}
+.series-warn{flex:none;white-space:nowrap;margin-left:8px;font-size:10px;font-weight:700;color:#f5a623;border:1px solid #f5a623;border-radius:4px;padding:1px 6px;vertical-align:middle}
 </style>
 
 <!-- Supabase 클라이언트 라이브러리 -->
@@ -377,6 +383,9 @@ window.SUPABASE_KEY = 'sb_publishable_-SWlLbUOplHaYdRTB_XYmg_C4ARIz8n';
     <div class="brand-logo"><span class="decco-mark">decco<sup>®</sup></span><span class="decco-sub">EXTRUSION</span></div>
     <span class="logo-t">창호 설계·견적 시스템</span>
     <span class="logo-s">v35 — 항목별 % 단가 조정</span>
+    <span class="series-sw" title="프레임·샤시·GB·공차 기준 시리즈 (창호별로 저장됨)">
+      <button type="button" class="series-btn on" data-series="83" onclick="switchSeries('83')">83</button><button type="button" class="series-btn" data-series="82" onclick="switchSeries('82')">82</button>
+    </span><span id="series-warn" class="series-warn" style="display:none" title="82 값이 아직 입력되지 않아 83과 동일하게 계산 중">⚠ 82 값 미입력</span>
     <a href="https://gealans9000-manager.vercel.app/index.html" target="_blank" rel="noopener" title="GEALAN 창호 견적 프로그램 열기 (새 탭)" style="margin-left:14px;padding:4px 12px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4);border-radius:6px;color:#fff;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:5px">🔷 GEALAN 창호 ↗</a>
   </div>
   <div class="hdr-btns"><span id="autosave-badge" style="font-size: 9px; color: var(--text3); margin-right: 4px; white-space: nowrap;">🔄 자동저장 21:06</span>
@@ -2380,6 +2389,59 @@ function clearAllTypedPresets(){
 // ────────────────────────────────────────────────
 // 헬퍼
 // ────────────────────────────────────────────────
+// ────────────────────────────────────────────────
+// ★ 시리즈(DECCO 83 / 82) 설정 — 프레임·샤시·중간바 폭, 공차, 유리/GB 차감값
+//   83 = 기존 값 그대로. 82 = 엑셀(DECCO_82_83_기준표.xlsx)에서 확정된 값으로 교체할 것
+//   ※ 82의 pending:true 가 남아 있는 동안은 83과 동일한 값(미확정)이며 화면에 경고가 표시됨
+// ────────────────────────────────────────────────
+const SERIES_83 = {
+  label:'DECCO 83',
+  pw:{F84:61.5,F70:43.5,M92:42,M64:32,M108:58,STOL:15},   // 프레임/중간바 폭, 샤시 공차
+  sashW:{S82:57.5,S89:-63,S108:184},                       // 샤시 한쪽 폭(유리 계산용)
+  doorSashW:92, projSashW:63,                              // 도어/프로젝트 샤시 한쪽 폭
+  openGlassSub:12, fixGlassSub:24,                         // 유리 차감 (오픈/픽스)
+  s108Side:56, s108Extra:60,                               // S106 유리 차감
+  mulTol:8,                                                // 중간바 공차
+  dpTol:16,                                                // 도어/프로젝트 샤시 공차
+  ttPairConst:6, ttPairTol:15,                             // 양개T/T 다중셀: (합−장애물−6+15)/2
+  ttttAdj:8, ttttAdj2:3,                                   // 양개T/T 2셀: 오픈W−fw+8−3
+  tstsTol:5,                                               // 양개T/S: 셀W+5−M92/2
+  gbOpen:12, gbFix:24                                      // GB 치수 = 유리 + 12(오픈) / 24(픽스)
+};
+const SERIES_DEFS = {
+  '83': SERIES_83,
+  // 82: 엑셀(DECCO_82_83_기준표.xlsx) 확정값 — 83과 다른 항목만 덮어씀 (나머지는 83과 동일)
+  '82': (function(){
+    const d = JSON.parse(JSON.stringify(SERIES_83));
+    d.label = 'DECCO 82';
+    d.sashW.S108 = 185;                 // 56+56+60+13
+    d.doorSashW = 91;  d.projSashW = 62;
+    d.openGlassSub = 13;  d.fixGlassSub = 13;   // 유리 차감
+    d.gbOpen = 13;  d.gbFix = 13;               // GB = 유리 + 13
+    return d;
+  })()
+};
+let CUR_SERIES = '83';
+function SX(){ return SERIES_DEFS[CUR_SERIES] || SERIES_DEFS['83']; }
+function setSeries(key, opts){
+  if(!SERIES_DEFS[key]) key='83';
+  CUR_SERIES = key;
+  const d = SERIES_DEFS[key];
+  for(const [k,v] of Object.entries(d.pw)){ const el=document.getElementById('pw-'+k); if(el) el.value=v; }
+  updateSeriesUI();
+  if(!(opts&&opts.noUpdate) && typeof update==='function') update();
+}
+function updateSeriesUI(){
+  document.querySelectorAll('.series-btn').forEach(b=>b.classList.toggle('on', b.dataset.series===CUR_SERIES));
+  const w=document.getElementById('series-warn');
+  if(w){ w.style.display = SX().pending ? 'inline-block' : 'none'; }
+  document.title = 'DECCO ' + CUR_SERIES + ' 창호 설계·견적 시스템 v35';
+}
+function switchSeries(key){
+  if(key===CUR_SERIES) return;
+  setSeries(key);
+  try{ if(typeof showToast==='function') showToast('시리즈: DECCO '+key+(SX().pending?' (82 값 미입력 — 83과 동일 계산)':'')); }catch(_){}
+}
 function P(id){return parseFloat(document.getElementById('p-'+id)?.value)||0}
 function PW(id){return parseFloat(document.getElementById('pw-'+id)?.value)||0}
 /* 치수(mm) 전용: 끝자리 0.5는 내림 (절단 치수가 0.5 작아야 조립·작동에 유리) — 예 550.5→550 */
@@ -2434,10 +2496,11 @@ function getSashTol(){return PW('STOL')||15;}
 /** 샤시 프로파일 한쪽 폭 (S82:56, S108:164, S89:-63) */
 function getSashProfileW(){
   const s=document.getElementById('sashType').value;
-  if(s==='S82')  return 57.5;
-  if(s==='S108') return 184;
-  if(s==='S89')  return -63;
-  return 57.5;
+  const sw = SX().sashW;
+  if(s==='S82')  return sw.S82;
+  if(s==='S108') return sw.S108;
+  if(s==='S89')  return sw.S89;
+  return sw.S82;
 }
 /** 유리 계산시 양쪽 합산 (한쪽폭 × 2) */
 function getSashWidth(){ return getSashProfileW()*2; }
@@ -4584,7 +4647,7 @@ function swapTTFIX(){
 function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
   const fw = getFrameWidth();
   const mw = getMullionWidth();
-  const tol = (baseType === 'PROJ' || baseType === 'DOOR') ? 16 : getSashTol();
+  const tol = (baseType === 'PROJ' || baseType === 'DOOR') ? SX().dpTol : getSashTol();
   const cols = g.cols, rows = g.rows;
   const r = cell.r, c = cell.c;
 
@@ -4598,7 +4661,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
   //   sashW = openW − fw + 8 − 3 (M64가 샤시에 직접 부착)
   //   ※ TTTT에 가로 중간바(수직 분할)가 추가되어 cols>2면 다중셀 양개로 인식되어 새 공식 적용
   if (baseType === 'TTTT' && cols === 2) {
-    sashW = openW - fw + 8 - 3;
+    sashW = openW - fw + SX().ttttAdj - SX().ttttAdj2;
 
   // ★ 양개T/S 전용 계산: [FIX, TS, TS, FIX] 구조에서 TS 셀(c=1,2)만 해당
   // 공식: 셀W + 안쪽공차(+5) − 바깥M92/2(20)
@@ -4607,7 +4670,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
   } else if (baseType === 'TSTS' && cell.ct === 'TS') {
     // TS1: c=1 → 바깥쪽=좌(M92/2=20), TS2: c=2 → 바깥쪽=우(M92/2=20)
     const outerMulHalf = mullionWidth('M92') / 2; // 20
-    sashW = openW + 5 - outerMulHalf; // 900 + 5 - 20 = 885
+    sashW = openW + SX().tstsTol - outerMulHalf; // 900 + 5 - 20 = 885
 
   // ★ 일반 다중셀 또는 양개T/T 확장형(cols>2)에서 가로 인접 TT 양개 — 새 공식 적용
   //   sashW = ((셀1폭 + 셀2폭) - 좌측장애물 - 우측장애물 - 6(양개상수) + 15(공차)) / 2
@@ -4629,7 +4692,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
       rightObst = (cell.rightCellRMW !== undefined) ? cell.rightCellRMW
                 : ((cell.c + 1 === cols-1) ? fw : mw/2);
     }
-    sashW = (cellsTotalW - leftObst - rightObst - 6 + 15) / 2;
+    sashW = (cellsTotalW - leftObst - rightObst - SX().ttPairConst + SX().ttPairTol) / 2;
 
   } else {
     // 일반 공식
@@ -4657,7 +4720,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
 // 도형 계산
 // ────────────────────────────────────────────────
 function computeGeom(W,H,nV,nH){
-  const fw=getFrameWidth(), mw=getMullionWidth(), tol=getSashTol(), mulTol=8;
+  const fw=getFrameWidth(), mw=getMullionWidth(), tol=getSashTol(), mulTol=SX().mulTol;
   const vPos=[0];for(let i=0;i<nV;i++){const el=document.getElementById('vp'+i);vPos.push(el?parseFloat(el.value):Math.round(W/(nV+1)*(i+1)))}vPos.push(W);
   const hPos=[0];for(let i=0;i<nH;i++){const el=document.getElementById('hp'+i);hPos.push(el?parseFloat(el.value):Math.round(H/(nH+1)*(i+1)))}hPos.push(H);
   const cols=nV+1,rows=nH+1,cells=[];
@@ -4778,18 +4841,18 @@ function computeGeom(W,H,nV,nH){
       const sw2=getSashWidth();
       let gW,gH;
       if(isFix){
-        gW=Math.max(0, cW - lMW - rMW - 24);
+        gW=Math.max(0, cW - lMW - rMW - SX().fixGlassSub);
         const adT=(r===0)?addonTop:0, adB=(r+rs>=rows)?addonBot:0;
-        gH=Math.max(0, cH - adT - adB - tMW - bMW - 24);
+        gH=Math.max(0, cH - adT - adB - tMW - bMW - SX().fixGlassSub);
       } else {
-        const effSw2 = (baseType==='DOOR') ? 92*2 : (baseType==='PROJ') ? 63*2 : sw2;
+        const effSw2 = (baseType==='DOOR') ? SX().doorSashW*2 : (baseType==='PROJ') ? SX().projSashW*2 : sw2;
         const _stype = document.getElementById('sashType').value;
         if(_stype==='S108'){
-          gW=Math.max(0, (sW||0) - 56 - 56 - 60 - 12);
-          gH=Math.max(0, (sH||0) - 56 - 56 - 60 - 12);
+          gW=Math.max(0, (sW||0) - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
+          gH=Math.max(0, (sH||0) - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
         } else {
-          gW=Math.max(0, (sW||0) - effSw2 - 12);
-          gH=Math.max(0, (sH||0) - effSw2 - 12);
+          gW=Math.max(0, (sW||0) - effSw2 - SX().openGlassSub);
+          gH=Math.max(0, (sH||0) - effSw2 - SX().openGlassSub);
         }
       }
 
@@ -7681,8 +7744,8 @@ function buildCutTable(W,H,g,ci){
   const fInfo=document.getElementById('cut-formula-info');
   if(fInfo){
     const spw_=getSashProfileW();
-    const effSpw_=(baseType==='DOOR')?92:(baseType==='PROJ')?63:spw_;
-    const projTolDisp=(baseType==='PROJ')?16:(baseType==='DOOR')?16:CUT.sashTol;
+    const effSpw_=(baseType==='DOOR')?SX().doorSashW:(baseType==='PROJ')?SX().projSashW:spw_;
+    const projTolDisp=(baseType==='PROJ'||baseType==='DOOR')?SX().dpTol:CUT.sashTol;
     fInfo.innerHTML=
       `<b>프레임</b>: 입력값 그대로 (덧바 있으면 차감: H−상덧바−하덧바 / W−좌덧바−우덧바)<br>`+
       `<b>샤시W</b>: 오픈W − 좌경계 − 우경계 + 공차(${projTolDisp})${baseType==='DOOR'?' <span style="color:var(--accent3)">(도어 전용)</span>':baseType==='PROJ'?' <span style="color:var(--accent3)">(ProJ 전용)</span>':''}<br>`+
@@ -7769,7 +7832,7 @@ function buildCutTable(W,H,g,ci){
 
   // ── 4. 샤시 치수 ──
   if(ci.sashCells.length>0){
-    const effSashTol = (baseType==='DOOR' || baseType==='PROJ') ? 16 : CUT.sashTol;
+    const effSashTol = (baseType==='DOOR' || baseType==='PROJ') ? SX().dpTol : CUT.sashTol;
     const isTTTT_basic = (baseType === 'TTTT' && g.cols === 2);  // 기본 양개T/T (셀 2개만)
     const isTTTT_ext = (baseType === 'TTTT' && g.cols > 2);      // 양개T/T 확장형
     const isTSTS = baseType === 'TSTS';
@@ -8061,24 +8124,24 @@ function buildCutTable(W,H,g,ci){
   // 픽스 유리 H: 밖에서 안으로 — 셀오픈H − 덧바상(최상단) − 덧바하(최하단) − fw − fw − 14
   // 샤시 유리: 샤시치수 − 샤시폭 − 샤시폭 − 14
   const spw = getSashProfileW();
-  const effSpw = (baseType==='DOOR') ? 92 : (baseType==='PROJ') ? 63 : spw;
-  h+=`<tr class="sh"><td colspan="4">🪟 유리 치수 — 샤시: ${dn(st)}폭(${effSpw})×2−12${baseType==='DOOR'?' (도어 전용)':baseType==='PROJ'?' (ProJ 전용)':''} / 픽스: 덧바−경계−경계−24</td></tr>`;
+  const effSpw = (baseType==='DOOR') ? SX().doorSashW : (baseType==='PROJ') ? SX().projSashW : spw;
+  h+=`<tr class="sh"><td colspan="4">🪟 유리 치수 — 샤시: ${dn(st)}폭(${effSpw})×2−${SX().openGlassSub}${baseType==='DOOR'?' (도어 전용)':baseType==='PROJ'?' (ProJ 전용)':''} / 픽스: 덧바−경계−경계−${SX().fixGlassSub}</td></tr>`;
   g.cells.forEach((c,i)=>{
     const gW=c.glassW, gH=c.glassH;
     const calcW=c.isFix
-      ? `${c.cW}−${c.lMW}−${c.rMW}−24`
-      : (st==='S108' ? `${c.sW||0}−56−56−60−12` : `${c.sW||0}−${effSpw}−${effSpw}−12`);
+      ? `${c.cW}−${c.lMW}−${c.rMW}−${SX().fixGlassSub}`
+      : (st==='S108' ? `${c.sW||0}−56−56−60−${SX().openGlassSub}` : `${c.sW||0}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
     const adT_=(c.r===0)?adTop:0, adB_=(c.r===g.rows-1)?adBot:0;
     const calcH=c.isFix
-      ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−24`
-      : (st==='S108' ? `${c.sH||0}−56−56−60−12` : `${c.sH||0}−${effSpw}−${effSpw}−12`);
+      ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−${SX().fixGlassSub}`
+      : (st==='S108' ? `${c.sH||0}−56−56−60−${SX().openGlassSub}` : `${c.sH||0}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
     h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDim(gW)}</td><td title="${calcH}">${rDim(gH)}</td><td>${qty}</td></tr>`;
   });
 
   // ── GB 사이즈 (유리 + 14) ──
   h+=`<tr class="sh"><td colspan="4">🔲 GB 치수 (유리+14)</td></tr>`;
   g.cells.forEach((c,i)=>{
-    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${rDim(c.glassW+(c.isFix?24:12))}</td><td>${rDim(c.glassH+(c.isFix?24:12))}</td><td>${qty}</td></tr>`;
+    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${rDim(c.glassW+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${rDim(c.glassH+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${qty}</td></tr>`;
   });
 
   // ── 방충망 ──
@@ -8351,8 +8414,8 @@ function updateFormulaPreview(W,H,g){
   const adT_=(sampleCell.r===0)?adT:0, adB_=(sampleCell.r===g.rows-1)?adB:0;
   const st=document.getElementById('sashType').value;
   const spw2 = getSashProfileW();
-  const effSpw2 = (baseType==='DOOR') ? 92 : (baseType==='PROJ') ? 63 : spw2;
-  const projTol = (baseType==='PROJ' || baseType==='DOOR') ? 16 : tol;
+  const effSpw2 = (baseType==='DOOR') ? SX().doorSashW : (baseType==='PROJ') ? SX().projSashW : spw2;
+  const projTol = (baseType==='PROJ' || baseType==='DOOR') ? SX().dpTol : tol;
   const sashW=openW-lE-rE+projTol;
   const sashH=openH-adT_-adB_-tE-bE+projTol;
   el.innerHTML=
@@ -8364,8 +8427,8 @@ function updateFormulaPreview(W,H,g){
     ` − 상경계(${tE}) − 하경계(${bE}) + 공차(${projTol})\n`+
     `= ${openH}${adT_?'-'+adT_:''}${adB_?'-'+adB_:''}-${tE}-${bE}+${projTol} = ${sashH}\n\n`+
     `[샤시 유리 공식]\n`+
-    `샤시치수 − ${dn(st)}폭(${effSpw2}) − ${dn(st)}폭(${effSpw2}) − 12${baseType==='DOOR'?' (도어 전용)':baseType==='PROJ'?' (ProJ 전용)':''}\n`+
-    `W유리 = ${sashW}-${effSpw2}-${effSpw2}-12 = ${sashW-effSpw2*2-12}\n`+
+    `샤시치수 − ${dn(st)}폭(${effSpw2}) − ${dn(st)}폭(${effSpw2}) − ${SX().openGlassSub}${baseType==='DOOR'?' (도어 전용)':baseType==='PROJ'?' (ProJ 전용)':''}\n`+
+    `W유리 = ${sashW}-${effSpw2}-${effSpw2}-${SX().openGlassSub} = ${sashW-effSpw2*2-SX().openGlassSub}\n`+
     `[유리 금액 공식]\n`+
     `W × H / 91809 = 평 (최소 3평), 평 × 단가/평\n\n`+
     `[픽스 유리 공식]\n`+
@@ -8406,6 +8469,7 @@ function getCurrentSettings(){
     pwM64: document.getElementById('pw-M64').value,
     pwM108: document.getElementById('pw-M108').value,
     pwSTOL: document.getElementById('pw-STOL').value,
+    series: CUR_SERIES,
     savedAt: new Date().toLocaleString('ko-KR'),
     label: `${baseType} ${document.getElementById('iW').value}×${document.getElementById('iH').value}`
   };
@@ -8437,12 +8501,9 @@ function applySettings(s){
   if(fixSelEl) fixSelEl.value=s.glassTypeFix||'same';
   // optScreen is now always enabled (moved to spec panel)
   // 프로파일 폭 — 데코 표준 사양 고정 (옛 게알란 프로젝트의 저장값 44/40 등으로 덮어쓰지 않음)
-  document.getElementById('pw-F84').value=61.5;
-  document.getElementById('pw-F70').value=43.5;
-  document.getElementById('pw-M92').value=42;
-  document.getElementById('pw-M64').value=32;
-  document.getElementById('pw-M108').value=58;
-  if(s.pwSTOL)document.getElementById('pw-STOL').value=s.pwSTOL;
+  // ★ 시리즈 복원 — 저장값에 series가 없으면(구버전) 83으로 간주해 기존 견적이 그대로 재현되게 함
+  setSeries(s.series||'83', {noUpdate:true});
+  if(s.pwSTOL && (s.series||'83')==='83')document.getElementById('pw-STOL').value=s.pwSTOL;
   // 창호 타입
   baseType=s.baseType||'TS';
   document.querySelectorAll('.wt-btn').forEach(b=>b.classList.remove('on'));
@@ -8679,7 +8740,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
   const frameH = H - adTop - adBot;
   const fw = g.fw;
   const tol = g.tol || 15;
-  const effSashTol = (baseType==='DOOR'||baseType==='PROJ') ? 16 : tol;
+  const effSashTol = (baseType==='DOOR'||baseType==='PROJ') ? SX().dpTol : tol;
   const isTTTT = baseType === 'TTTT';
   const isTSTS = baseType === 'TSTS';
 
@@ -10324,8 +10385,8 @@ function buildGBListHTML(){
         if(!gW||!gH) return;
         gbList.push({
           winNum,
-          gbW: gW + 12,
-          gbH: gH + 12,
+          gbW: gW + SX().gbOpen,
+          gbH: gH + SX().gbOpen,
           qty,
           markLoc,
           kind: item.wo.sashs.length > 1 ? `OPEN-${si+1}` : 'OPEN',
@@ -10343,8 +10404,8 @@ function buildGBListHTML(){
         if(!gW||!gH) return;
         gbList.push({
           winNum,
-          gbW: gW + 24,
-          gbH: gH + 24,
+          gbW: gW + SX().gbFix,
+          gbH: gH + SX().gbFix,
           qty,
           markLoc,
           kind: item.wo.fixGlasses.length > 1 ? `FIX-${si+1}` : 'FIX',
@@ -10889,7 +10950,7 @@ function batchExcel(){
         item.wo.sashs.forEach((s, si) => {
           if(!s.glassW || !s.glassH) return;
           const kind = item.wo.sashs.length > 1 ? `OPEN-${si+1}` : 'OPEN';
-          sheets += `<tr style="text-align:center;font-size:13px;color:#222"><td style="text-align:center">${winNum}</td><td style="text-align:center">${s.glassW+12}</td><td style="text-align:center">${s.glassH+12}</td><td style="text-align:center">${qty}</td><td style="text-align:center">${markLoc||'-'}</td><td style="text-align:center">${kind}</td><td style="text-align:center">${gbLabel}</td></tr>`;
+          sheets += `<tr style="text-align:center;font-size:13px;color:#222"><td style="text-align:center">${winNum}</td><td style="text-align:center">${s.glassW+SX().gbOpen}</td><td style="text-align:center">${s.glassH+SX().gbOpen}</td><td style="text-align:center">${qty}</td><td style="text-align:center">${markLoc||'-'}</td><td style="text-align:center">${kind}</td><td style="text-align:center">${gbLabel}</td></tr>`;
           gbTotalQty += qty;
         });
       }
@@ -10898,7 +10959,7 @@ function batchExcel(){
         item.wo.fixGlasses.forEach((s, si) => {
           if(!s.glassW || !s.glassH) return;
           const kind = item.wo.fixGlasses.length > 1 ? `FIX-${si+1}` : 'FIX';
-          sheets += `<tr style="text-align:center;font-size:13px;color:#222"><td style="text-align:center">${winNum}</td><td style="text-align:center">${s.glassW+24}</td><td style="text-align:center">${s.glassH+24}</td><td style="text-align:center">${qty}</td><td style="text-align:center">${markLoc||'-'}</td><td style="text-align:center">${kind}</td><td style="text-align:center">${gbLabel}</td></tr>`;
+          sheets += `<tr style="text-align:center;font-size:13px;color:#222"><td style="text-align:center">${winNum}</td><td style="text-align:center">${s.glassW+SX().gbFix}</td><td style="text-align:center">${s.glassH+SX().gbFix}</td><td style="text-align:center">${qty}</td><td style="text-align:center">${markLoc||'-'}</td><td style="text-align:center">${kind}</td><td style="text-align:center">${gbLabel}</td></tr>`;
           gbTotalQty += qty;
         });
       }
