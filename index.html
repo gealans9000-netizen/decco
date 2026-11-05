@@ -2452,6 +2452,8 @@ function P(id){return parseFloat(document.getElementById('p-'+id)?.value)||0}
 function PW(id){return parseFloat(document.getElementById('pw-'+id)?.value)||0}
 /* 치수(mm) 전용: 끝자리 0.5는 내림 (절단 치수가 0.5 작아야 조립·작동에 유리) — 예 550.5→550 */
 function rDim(x){return Math.ceil(x-0.5);}
+/* 유리 치수 반올림: 83 = 기존(0.5 내림), 82 = 0.5 올림(115.5→116) */
+function rDimG(x){return (CUR_SERIES==='82')?Math.floor(x+0.5+1e-9):rDim(x);}
 /* 표시명 매핑: 내부코드→데코 표기 (계산엔 영향 없음, 화면 표시만) */
 const DNAME={F70:'F72',F84:'F90',M92:'M99',M64:'M81',M108:'M99+',S82:'S78',S89:'S81',S108:'S106'};
 function dn(x){return (DNAME&&DNAME[x])||x;}
@@ -7663,8 +7665,8 @@ function computeCost(W,H,g){
          const minMark = raw < 3 ? `→3평(최소)` : `${applied.toFixed(2)}평`;
          const typeTag = (!sameFix && fixCells.length>0) ? ` [${c.isFix?'FIX':'OPEN'}]` : '';
          return g.cells.length>1
-           ? `셀${i+1}${typeTag}(${rDim(c.glassW)}×${rDim(c.glassH)}): ${raw.toFixed(2)}평 ${minMark}`
-           : `${rDim(c.glassW)}×${rDim(c.glassH)}mm${typeTag}: ${raw.toFixed(2)}평 ${minMark}`;
+           ? `셀${i+1}${typeTag}(${rDimG(c.glassW)}×${rDimG(c.glassH)}): ${raw.toFixed(2)}평 ${minMark}`
+           : `${rDimG(c.glassW)}×${rDimG(c.glassH)}mm${typeTag}: ${raw.toFixed(2)}평 ${minMark}`;
        }).join(' / ');
        const priceStr = (!sameFix && fixCells.length>0)
          ? `OPEN ${openGlassPyeong.toFixed(2)}평×${fmt(glassUnitPrice())}/평 + FIX ${fixGlassPyeong.toFixed(2)}평×${fmt(glassUnitPriceFix())}/평`
@@ -8141,13 +8143,13 @@ function buildCutTable(W,H,g,ci){
     const calcH=c.isFix
       ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−${SX().fixGlassSub}`
       : (st==='S108' ? `${c.sH||0}−56−56−60−${SX().openGlassSub}` : `${c.sH||0}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
-    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDim(gW)}</td><td title="${calcH}">${rDim(gH)}</td><td>${qty}</td></tr>`;
+    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDimG(gW)}</td><td title="${calcH}">${rDimG(gH)}</td><td>${qty}</td></tr>`;
   });
 
   // ── GB 사이즈 (유리 + 14) ──
   h+=`<tr class="sh"><td colspan="4">🔲 GB 치수 (유리+14)</td></tr>`;
   g.cells.forEach((c,i)=>{
-    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${rDim(c.glassW+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${rDim(c.glassH+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${qty}</td></tr>`;
+    h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} GB</td><td>${rDimG(c.glassW+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${rDimG(c.glassH+(c.isFix?SX().gbFix:SX().gbOpen))}</td><td>${qty}</td></tr>`;
   });
 
   // ── 방충망 ──
@@ -8781,14 +8783,14 @@ function collectWorkOrderData(W, H, qty, g, ci){
       W: rDim(cutW), H: rDim(cutH),
       reinfW: Math.round((c.sW||0) - sReinfSub),
       reinfH: Math.round((c.sH||0) - sReinfSub),
-      glassW: rDim(c.glassW), glassH: rDim(c.glassH),
+      glassW: rDimG(c.glassW), glassH: rDimG(c.glassH),
       openW: Math.round(c.cW), openH: Math.round(c.cH),
     };
   });
 
   // ── FIX 셀 유리 ──
   const fixGlasses = g.cells.filter(c=>c.isFix).map((c,i)=>({
-    idx: i+1, glassW: rDim(c.glassW), glassH: rDim(c.glassH)
+    idx: i+1, glassW: rDimG(c.glassW), glassH: rDimG(c.glassH)
   }));
 
   // ── 중간바 절단 ──
