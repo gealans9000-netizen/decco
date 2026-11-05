@@ -2453,6 +2453,7 @@ function PW(id){return parseFloat(document.getElementById('pw-'+id)?.value)||0}
 /* 치수(mm) 전용: 끝자리 0.5는 내림 (절단 치수가 0.5 작아야 조립·작동에 유리) — 예 550.5→550 */
 function rDim(x){return Math.ceil(x-0.5);}
 /* 유리 치수 반올림: 83 = 기존(0.5 내림), 82 = 0.5 올림(115.5→116) */
+function sGl(c,k){ const r=(k==='W')?c.sWr:c.sHr, v=(k==='W')?c.sW:c.sH; return (CUR_SERIES==='82' && r!=null)?r:(v||0); }
 function rDimG(x){return (CUR_SERIES==='82')?Math.floor(x+0.5+1e-9):rDim(x);}
 /* 표시명 매핑: 내부코드→데코 표기 (계산엔 영향 없음, 화면 표시만) */
 const DNAME={F70:'F72',F84:'F90',M92:'M99',M64:'M81',M108:'M99+',S82:'S78',S89:'S81',S108:'S106'};
@@ -4719,7 +4720,7 @@ function computeSashDims(cell, g, addonTop, addonBot, lMW, rMW, tMW, bMW){
   const bottomEdge = (bMW !== undefined) ? bMW : ((r === rows-1) ? fw : mw/2);
   const sashH = openH - topAddon - botAddon - topEdge - bottomEdge + tol;
 
-  return {sashW: rDim(sashW), sashH: rDim(sashH),
+  return {sashW: rDim(sashW), sashH: rDim(sashH), rawW: sashW, rawH: sashH,
           leftEdge, rightEdge, topEdge, bottomEdge, tol, fw, mw,
           openW, openH, topAddon, botAddon};
 }
@@ -4808,7 +4809,7 @@ function computeGeom(W,H,nV,nH){
       const bMW = (r+rs)>=rows ? fw : mullionWidth(getHMulType(r+rs-1))/2;
 
       // 샤시 치수
-      let sW=null,sH=null;
+      let sW=null,sH=null,sWr=null,sHr=null;
       if(!isFix){
         // 양개 인접 TT 인식 — 좌/우 인접 셀이 TT(또는 호환 ct)인지 확인
         // 인접 셀의 ct가 TT거나, baseType이 TTTT/TSTS면서 effBase가 TT일 때 양개로 처리
@@ -4843,6 +4844,8 @@ function computeGeom(W,H,nV,nH){
         const dims=computeSashDims(tmp,{nV,nH,cols,rows},addonTop,addonBot,lMW,rMW,tMW,bMW);
         sW=Math.max(0,dims.sashW);
         sH=Math.max(0,dims.sashH);
+        sWr=Math.max(0,dims.rawW);   // 반올림(내림) 전 샤시 치수 — 82 유리 계산용
+        sHr=Math.max(0,dims.rawH);
       }
 
       // 유리 치수
@@ -4855,17 +4858,20 @@ function computeGeom(W,H,nV,nH){
       } else {
         const effSw2 = (baseType==='DOOR') ? SX().doorSashW*2 : (baseType==='PROJ') ? SX().projSashW*2 : sw2;
         const _stype = document.getElementById('sashType').value;
+        // ★ 82: 유리는 샤시 절단치수(내림값)가 아니라 내림 전 원값(예 950.5)에서 계산 후 반올림
+        const _gsW = (CUR_SERIES==='82' && sWr!=null) ? sWr : (sW||0);
+        const _gsH = (CUR_SERIES==='82' && sHr!=null) ? sHr : (sH||0);
         if(_stype==='S108'){
-          gW=Math.max(0, (sW||0) - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
-          gH=Math.max(0, (sH||0) - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
+          gW=Math.max(0, _gsW - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
+          gH=Math.max(0, _gsH - SX().s108Side*2 - SX().s108Extra - SX().openGlassSub);
         } else {
-          gW=Math.max(0, (sW||0) - effSw2 - SX().openGlassSub);
-          gH=Math.max(0, (sH||0) - effSw2 - SX().openGlassSub);
+          gW=Math.max(0, _gsW - effSw2 - SX().openGlassSub);
+          gH=Math.max(0, _gsH - effSw2 - SX().openGlassSub);
         }
       }
 
       // 셀 이름 계산 (FIX 번호 매기기)
-      cells.push({r,c,x0,y0,cW,cH,ct,isFix,sW,sH,glassW:gW,glassH:gH,lMW,rMW,tMW,bMW,
+      cells.push({r,c,x0,y0,cW,cH,ct,isFix,sW,sH,sWr,sHr,glassW:gW,glassH:gH,lMW,rMW,tMW,bMW,
                   colspan:cs,rowspan:rs});
     }
   }
@@ -8138,11 +8144,11 @@ function buildCutTable(W,H,g,ci){
     const gW=c.glassW, gH=c.glassH;
     const calcW=c.isFix
       ? `${c.cW}−${c.lMW}−${c.rMW}−${SX().fixGlassSub}`
-      : (st==='S108' ? `${c.sW||0}−56−56−60−${SX().openGlassSub}` : `${c.sW||0}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
+      : (st==='S108' ? `${sGl(c,'W')}−56−56−60−${SX().openGlassSub}` : `${sGl(c,'W')}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
     const adT_=(c.r===0)?adTop:0, adB_=(c.r===g.rows-1)?adBot:0;
     const calcH=c.isFix
       ? `${c.cH}${adT_?'−'+adT_:''}${adB_?'−'+adB_:''}−${c.tMW}−${c.bMW}−${SX().fixGlassSub}`
-      : (st==='S108' ? `${c.sH||0}−56−56−60−${SX().openGlassSub}` : `${c.sH||0}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
+      : (st==='S108' ? `${sGl(c,'H')}−56−56−60−${SX().openGlassSub}` : `${sGl(c,'H')}−${effSpw}−${effSpw}−${SX().openGlassSub}`);
     h+=`<tr><td>${c.cellName||((c.isFix?'픽스':'OPEN')+(i+1))} (${c.ct})</td><td title="${calcW}">${rDimG(gW)}</td><td title="${calcH}">${rDimG(gH)}</td><td>${qty}</td></tr>`;
   });
 
