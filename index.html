@@ -217,6 +217,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:10px 0}
 
 .logo-t{white-space:nowrap;flex:none}
 .logo-s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+#hdr{transition:background .2s,border-color .2s}
+#hdr[data-series="82"]{background:#1f5f55;border-bottom:2px solid #34b39c}
+#hdr[data-series="83"]{background:#3a3f4b;border-bottom:1px solid #4a4f5b}
+#hdr[data-series="82"] .series-btn.on{background:#34b39c;color:#06201b}
 .series-sw{display:inline-flex;flex:none;white-space:nowrap;margin-left:10px;border:1px solid #3d4358;border-radius:6px;overflow:hidden;vertical-align:middle}
 .series-btn{flex:none;background:#1d2130;color:#b0b8c5;border:none;padding:3px 12px;font-size:12px;font-weight:800;cursor:pointer}
 .series-btn.on{background:#5b8def;color:#fff}
@@ -2435,6 +2439,7 @@ function updateSeriesUI(){
   document.querySelectorAll('.series-btn').forEach(b=>b.classList.toggle('on', b.dataset.series===CUR_SERIES));
   const w=document.getElementById('series-warn');
   if(w){ w.style.display = SX().pending ? 'inline-block' : 'none'; }
+  const hd=document.getElementById('hdr'); if(hd) hd.dataset.series=CUR_SERIES;
   document.title = 'DECCO ' + CUR_SERIES + ' 창호 설계·견적 시스템 v35';
 }
 function switchSeries(key){
@@ -2442,6 +2447,7 @@ function switchSeries(key){
   setSeries(key);
   try{ if(typeof showToast==='function') showToast('시리즈: DECCO '+key+(SX().pending?' (82 값 미입력 — 83과 동일 계산)':'')); }catch(_){}
 }
+document.addEventListener('DOMContentLoaded',function(){ try{ updateSeriesUI(); }catch(_){} });
 function P(id){return parseFloat(document.getElementById('p-'+id)?.value)||0}
 function PW(id){return parseFloat(document.getElementById('pw-'+id)?.value)||0}
 /* 치수(mm) 전용: 끝자리 0.5는 내림 (절단 치수가 0.5 작아야 조립·작동에 유리) — 예 550.5→550 */
