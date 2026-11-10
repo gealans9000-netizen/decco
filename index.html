@@ -2422,6 +2422,7 @@ const SERIES_DEFS = {
     d.doorSashW = 91;  d.projSashW = 62;
     d.openGlassSub = 13;  d.fixGlassSub = 13;   // 유리 차감
     d.gbOpen = 13;  d.gbFix = 13;               // GB = 유리 + 13
+    d.mulTol = 0;                               // 중간바 공차 없음 (3000−43.5−43.5)
     return d;
   })()
 };
@@ -7764,8 +7765,8 @@ function buildCutTable(W,H,g,ci){
       `<b>프레임</b>: 입력값 그대로 (덧바 있으면 차감: H−상덧바−하덧바 / W−좌덧바−우덧바)<br>`+
       `<b>샤시W</b>: 오픈W − 좌경계 − 우경계 + 공차(${projTolDisp})${baseType==='DOOR'?' <span style="color:var(--accent3)">(도어 전용)</span>':baseType==='PROJ'?' <span style="color:var(--accent3)">(ProJ 전용)</span>':''}<br>`+
       `<b>샤시H</b>: 오픈H − 상경계 − 하경계 + 공차(${projTolDisp})${baseType==='DOOR'?' <span style="color:var(--accent3)">(도어 전용)</span>':baseType==='PROJ'?' <span style="color:var(--accent3)">(ProJ 전용)</span>':''}<br>`+
-      `<b>수직중간바</b>: 프레임H(H−덧바상−덧바하) − fw − fw + 8<br>`+
-      `<b>수평중간바</b>: 프레임W(W−덧바좌−덧바우) − fw − fw + 8<br>`+
+      `<b>수직중간바</b>: 프레임H(H−덧바상−덧바하) − fw − fw${SX().mulTol?' + '+SX().mulTol:''}<br>`+
+      `<b>수평중간바</b>: 프레임W(W−덧바좌−덧바우) − fw − fw${SX().mulTol?' + '+SX().mulTol:''}<br>`+
       `<b>샤시유리</b>: 샤시치수 − ${dn(st)}폭(${effSpw_}) − ${dn(st)}폭(${effSpw_}) − 12${baseType==='DOOR'?' <span style="color:var(--accent3)">(도어 전용)</span>':baseType==='PROJ'?' <span style="color:var(--accent3)">(ProJ 전용)</span>':''}<br>`+
       `<b>픽스유리</b>: 오픈치수 − 경계 − 경계 − 24<br>`+
       `<b>GB</b>: 유리치수 + 오픈12/픽스24 &nbsp; <b>보강재</b>: 프레임(${ft==='F84'?130:105}차감) / 샤시(${st==='S108'?190:st==='S89'?147:130}차감) / 중간바(−28)`;
