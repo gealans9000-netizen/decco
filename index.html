@@ -2445,7 +2445,7 @@ function updateSeriesUI(){
 }
 // ★ 계산 규칙 버전 — 82 계산 규칙(공차·반올림 등)을 바꿀 때마다 올릴 것.
 //   82로 저장된 창호의 wo.calcRev 가 다르면 "이전 계산값"으로 간주하고 재계산을 안내함
-const CALC_REV = '82-2026.11.10a';
+const CALC_REV = '82-2026.11.10b';
 function staleSeriesItems(){
   return (typeof orderItems!=='undefined' ? orderItems : []).filter(it=>!it.cancelled && it.snapshot && it.snapshot.series==='82' && (!it.wo || it.wo.calcRev!==CALC_REV));
 }
@@ -2620,7 +2620,7 @@ function computeVMulCut(i, g){
     const topDesc = (seg.firstR===0||vPrimary) ? `F(${fw})` : (topUseH ? `${topMT}/2(${topBnd})` : `F(${fw})`);
     const botDesc = (seg.lastR===g.rows-1||vPrimary) ? `F(${fw})` : (botUseH ? `${botMT}/2(${botBnd})` : `F(${fw})`);
     const rawSpan = y1-y0;
-    formulaParts.push(`${rawSpan}${(adTop||adBot)?`−덧(${adTop}+${adBot})`:''}→${spanH}−${topDesc}−${botDesc}+${tol}=${rDim(cutLen)}`);
+    formulaParts.push(`${rawSpan}${(adTop||adBot)?`−덧(${adTop}+${adBot})`:''}→${spanH}−${topDesc}−${botDesc}+${tol}=${rDimG(cutLen)}`);
   });
   return {cutLen:Math.max(0,totalCutLen), segs, formula:formulaParts.join(' | ')};
 }
@@ -2674,7 +2674,7 @@ function computeHMulCut(i, g){
     totalCutLen   += cutLen;
     const lDesc    = leftType==='frame'  ? `F(${fw})` : `${leftMT}/2(${leftBnd})`;
     const rDesc    = rightType==='frame' ? `F(${fw})` : `${rightMT}/2(${rightBnd})`;
-    formulaParts.push(`${spanW}−${lDesc}−${rDesc}+${tol}=${rDim(cutLen)}`);
+    formulaParts.push(`${spanW}−${lDesc}−${rDesc}+${tol}=${rDimG(cutLen)}`);
   });
   return {cutLen:Math.max(0,totalCutLen), segs, formula:formulaParts.join(' | ')};
 }
@@ -7954,7 +7954,7 @@ function buildCutTable(W,H,g,ci){
             const rowSash=ci.sashCells.filter(sc=>sc.r===r)[0];
             if(rowSash){const cutH=rowSash.sH-84-4;h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)}) <span style="color:var(--accent3);font-size:9px">★샤시부착(행${r+1})</span></td><td>—</td><td title="샤시H(${rowSash.sH})−84−4">${cutH}</td><td>${qty}</td></tr>`;}
           } else {
-            const fw2=g.fw,tol2=g.mulTol;const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
+            const fw2=g.fw,tol2=g.mulTol;const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;const segCut=rDimG((y1-y0)-topBnd-botBnd+tol2);
             if(segCut>0)h+=`<tr><td>수직${vSpecIdx++} (M99) <span style="color:var(--text3);font-size:9px">(FIX구간)</span></td><td>—</td><td>${segCut}</td><td>${qty}</td></tr>`;
           }
         }
@@ -7970,11 +7970,11 @@ function buildCutTable(W,H,g,ci){
             const _vp=getMulPriority()==='V';
             const topBnd=seg.firstR===0?fw2:(_vp?fw2:mullionWidth(getHMulType(seg.firstR-1))/2);
             const botBnd=seg.lastR===g.rows-1?fw2:(_vp?fw2:mullionWidth(getHMulType(seg.lastR))/2);
-            const segCut=rDim(spanH-topBnd-botBnd+tol2);
+            const segCut=rDimG(spanH-topBnd-botBnd+tol2);
             h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="행${seg.firstR+1}~${seg.lastR+1}">${segCut}</td><td>${qty}</td></tr>`;
           });
         } else {
-          h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="${res.formula}">${rDim(res.cutLen)}</td><td>${qty}</td></tr>`;
+          h+=`<tr><td>수직${vSpecIdx++} (${dn(vt)})</td><td>—</td><td title="${res.formula}">${rDimG(res.cutLen)}</td><td>${qty}</td></tr>`;
         }
       }
     }
@@ -7986,11 +7986,11 @@ function buildCutTable(W,H,g,ci){
           const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
           const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
           const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-          const segCut = rDim((x1-x0)-leftBnd-rightBnd+g.mulTol);
+          const segCut = rDimG((x1-x0)-leftBnd-rightBnd+g.mulTol);
           h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="열${seg.firstC+1}~${seg.lastC+1}">${segCut}</td><td>—</td><td>${qty}</td></tr>`;
         });
       } else {
-        h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="${res.formula}">${rDim(res.cutLen)}</td><td>—</td><td>${qty}</td></tr>`;
+        h+=`<tr><td>수평${hSpecIdx++} (${dn(ht)})</td><td title="${res.formula}">${rDimG(res.cutLen)}</td><td>—</td><td>${qty}</td></tr>`;
       }
     }
   }
@@ -8038,7 +8038,7 @@ function buildCutTable(W,H,g,ci){
               const fw2=g.fw,tol2=g.mulTol;
               const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;
               const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;
-              const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
+              const segCut=rDimG((y1-y0)-topBnd-botBnd+tol2);
               if(segCut>0)h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (M99) <span style="color:var(--text3);font-size:9px">(FIX구간)</span></td><td>—</td><td>${segCut-90}</td><td>${qty}</td></tr>`;
             }
           }
@@ -8054,11 +8054,11 @@ function buildCutTable(W,H,g,ci){
               const _vp2=getMulPriority()==='V';
               const topBnd=seg.firstR===0?fw2:(_vp2?fw2:mullionWidth(getHMulType(seg.firstR-1))/2);
               const botBnd=seg.lastR===g.rows-1?fw2:(_vp2?fw2:mullionWidth(getHMulType(seg.lastR))/2);
-              const segCut=rDim(spanH-topBnd-botBnd+tol2);
+              const segCut=rDimG(spanH-topBnd-botBnd+tol2);
               h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (${dn(vt)})</td><td>—</td><td title="행${seg.firstR+1}~${seg.lastR+1} − 90">${segCut-90}</td><td>${qty}</td></tr>`;
             });
           } else {
-            const vCutLen = rDim(res.cutLen);
+            const vCutLen = rDimG(res.cutLen);
             h+=`<tr><td>수직중간바${vReinIdx++} 보강재 (${dn(vt)})</td><td>—</td><td>${vCutLen - 90}</td><td>${qty}</td></tr>`;
           }
         }
@@ -8071,11 +8071,11 @@ function buildCutTable(W,H,g,ci){
             const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
             const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
             const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-            const segCut = rDim((x1-x0)-leftBnd-rightBnd+g.mulTol);
+            const segCut = rDimG((x1-x0)-leftBnd-rightBnd+g.mulTol);
             h+=`<tr><td>수평중간바${hReinIdx++} 보강재 (${dn(ht)})</td><td title="열${seg.firstC+1}~${seg.lastC+1} − 90">${segCut-90}</td><td>—</td><td>${qty}</td></tr>`;
           });
         } else {
-          const hCutLen = rDim(res.cutLen);
+          const hCutLen = rDimG(res.cutLen);
           h+=`<tr><td>수평중간바${hReinIdx++} 보강재 (${dn(ht)})</td><td>${hCutLen - 90}</td><td>—</td><td>${qty}</td></tr>`;
         }
       }
@@ -8846,7 +8846,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
           const fw2=g.fw,tol2=g.mulTol;
           const topBnd=r===0?fw2:mullionWidth(getHMulType(r-1))/2;
           const botBnd=r===g.rows-1?fw2:mullionWidth(getHMulType(r))/2;
-          const segCut=rDim((y1-y0)-topBnd-botBnd+tol2);
+          const segCut=rDimG((y1-y0)-topBnd-botBnd+tol2);
           if(segCut>0) mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:'M92',H:segCut,reinfH:Math.round(segCut-90)});
         }
       }
@@ -8862,11 +8862,11 @@ function collectWorkOrderData(W, H, qty, g, ci){
           const spanH=(y1-y0)-adTop-adBot;
           const topBnd=seg.firstR===0?fw2:mullionWidth(getHMulType(seg.firstR-1))/2;
           const botBnd=seg.lastR===g.rows-1?fw2:mullionWidth(getHMulType(seg.lastR))/2;
-          const segCut=rDim(spanH-topBnd-botBnd+tol2);
+          const segCut=rDimG(spanH-topBnd-botBnd+tol2);
           mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:vt,H:segCut,reinfH:Math.round(segCut-90)});
         });
       } else {
-        const cutH=rDim(res.cutLen);
+        const cutH=rDimG(res.cutLen);
         mullions.push({dir:'수직',idx:vMulGlobalIdx++,type:vt,H:cutH,reinfH:Math.round(cutH-90)});
       }
     }
@@ -8880,12 +8880,12 @@ function collectWorkOrderData(W, H, qty, g, ci){
         const x0=g.vPos[seg.firstC], x1=g.vPos[seg.lastC+1];
         const leftBnd = seg.firstC===0 ? fw : mullionWidth(getVMulType(seg.firstC-1))/2;
         const rightBnd = seg.lastC===g.cols-1 ? fw : mullionWidth(getVMulType(seg.lastC))/2;
-        const segCut = rDim((x1-x0)-leftBnd-rightBnd+tol);
+        const segCut = rDimG((x1-x0)-leftBnd-rightBnd+tol);
         mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:segCut,reinfW:Math.round(segCut-90)});
       });
     } else {
-      const mReinfW = rDim(res.cutLen) - 90;
-      mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:rDim(res.cutLen),reinfW:rDim(mReinfW)});
+      const mReinfW = rDimG(res.cutLen) - 90;
+      mullions.push({dir:'수평',idx:hMulGlobalIdx++,type:ht,W:rDimG(res.cutLen),reinfW:rDimG(mReinfW)});
     }
   }
 
