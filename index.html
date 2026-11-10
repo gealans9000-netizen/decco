@@ -2443,6 +2443,20 @@ function updateSeriesUI(){
   const hd=document.getElementById('hdr'); if(hd) hd.dataset.series=CUR_SERIES;
   document.title = 'DECCO ' + CUR_SERIES + ' 창호 설계·견적 시스템 v35';
 }
+// ★ 계산 규칙 버전 — 82 계산 규칙(공차·반올림 등)을 바꿀 때마다 올릴 것.
+//   82로 저장된 창호의 wo.calcRev 가 다르면 "이전 계산값"으로 간주하고 재계산을 안내함
+const CALC_REV = '82-2026.11.10a';
+function staleSeriesItems(){
+  return (typeof orderItems!=='undefined' ? orderItems : []).filter(it=>!it.cancelled && it.snapshot && it.snapshot.series==='82' && (!it.wo || it.wo.calcRev!==CALC_REV));
+}
+// 출력(절단리스트/엑셀/인쇄) 직전 호출: 이전 계산값이 있으면 재계산 여부를 묻고 true 반환(= 이번 출력 중단)
+function guardStaleOutput(){
+  const st = staleSeriesItems();
+  if(!st.length) return false;
+  if(!confirm('DECCO 82 창호 '+st.length+'개가 이전 계산값으로 저장되어 있습니다.\n(유리 반올림·중간바 공차 등이 최신 규칙과 다를 수 있음)\n\n지금 재계산할까요?\n[확인] 재계산 후 다시 출력 버튼을 눌러 주세요  /  [취소] 이전 값으로 그대로 출력')) return false;
+  regenerateAllDiagrams().then(()=>{ try{showToast('✅ 재계산 완료 — 출력 버튼을 다시 눌러 주세요');}catch(_){} });
+  return true;
+}
 function switchSeries(key){
   if(key===CUR_SERIES) return;
   setSeries(key);
@@ -3781,7 +3795,9 @@ function renderItemList(){
   const TYPE_LABEL={TS:'T/S',TT:'T/T',TO:'T/O',FIX:'FIX',DOOR:'DOOR',PROJ:'ProJ',TTFIX:'T/T+FIX',TTTT:'양개T/T',TSTS:'양개T/S'};
 
   // 상단: 일괄 편집 팝업 열기 버튼
-  const bulkEditBar = `
+  const _stale = staleSeriesItems();
+  const staleBar = _stale.length ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#fff0f0;border:1.5px solid #d84545;border-radius:var(--r2)"><span style="font-size:11px;color:#a32828;font-weight:700">⚠ DECCO 82 창호 ${_stale.length}개가 이전 계산값입니다 (절단/유리 리스트에 옛 값이 나옴)</span><button class="btn btn-sm" style="margin-left:auto;background:#d84545;color:#fff;border:none;font-size:10px" onclick="regenerateAllDiagrams()">🔄 지금 재계산</button></div>` : '';
+  const bulkEditBar = staleBar + `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#fff8ec;border:1.5px solid #f5a623;border-radius:var(--r2)">
       <span style="font-size:11px;color:#8a5a12;font-weight:700">📋 여러 창호의 업체/색상/유리 등을 한 번에 수정:</span>
       <button onclick="openBulkEditWindow()"
@@ -8922,6 +8938,7 @@ function collectWorkOrderData(W, H, qty, g, ci){
   const hasOutsideOpen = document.getElementById('optOutsideOpen')?.checked || false;
 
   return {
+    calcRev: CALC_REV, series: CUR_SERIES,
     frame, sashs, fixGlasses, mullions, tsRails, screens,
     openW, openH,
     ft, st, blk, colorOut, colorIn,
@@ -9152,6 +9169,7 @@ function updateBulkBar(){
 async function batchPrint(){
   window._relExtraSites = [];   // 출고증: 이전 세션의 클라우드 추가 현장 초기화
   if(!orderItems.length){alert('견적 목록이 없습니다.');return}
+  if(guardStaleOutput()) return;
   const chkSched   = document.getElementById('chk-schedule')?.checked;
   const chkWork    = document.getElementById('chk-workorder')?.checked;
   const chkCut     = document.getElementById('chk-cutlist')?.checked;
@@ -10526,6 +10544,7 @@ function buildGBListHTML(){
 // ── 엑셀 저장 ──
 function batchExcel(){
   if(!orderItems.length){alert('견적 목록이 없습니다.');return}
+  if(guardStaleOutput()) return;
   const chkSched = document.getElementById('chk-schedule')?.checked;
   const chkWork  = document.getElementById('chk-workorder')?.checked;
   const chkCut   = document.getElementById('chk-cutlist')?.checked;
@@ -13785,6 +13804,7 @@ function renderCutList(){
 
 function printCutList(opts){
   if(!orderItems.length){alert('견적 목록이 없습니다.');return}
+  if(guardStaleOutput()) return;
   const data = buildCutData();
   const today = new Date().toLocaleDateString('ko-KR');
   const site  = orderItems[0]?.site || '';
