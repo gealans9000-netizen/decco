@@ -9733,20 +9733,21 @@ function laborTypeLabel(n){
   }
 // 임가공 비용 정산 HTML
 function getBatchLaborCostHTML(){
-  if(!orderItems.length) return '';
+  if(!orderItems.filter(i=>!i.cancelled).length) return '';
   const fmt = n => (n||0).toLocaleString('ko-KR');
   const today = new Date().toLocaleDateString('ko-KR');
   const tdC = 'border:1px solid #cfe3df;padding:5px 6px;text-align:center';
   const tdR = 'border:1px solid #cfe3df;padding:5px 6px;text-align:right;font-family:monospace';
-  let rowsHtml=''; let grand=0; let totalQty=0;
+  let rowsHtml=''; let grand=0; let totalQty=0; let _rowNo=0;
   orderItems.forEach((item,idx)=>{
+    if(item.cancelled) return;          // 취소된 창호는 임가공비에서 제외 (번호는 목록 번호 유지)
     const n = laborCellCount(item);
     const unit = calcLaborCost(n.nV,n.nF,n.nTS,n.nDoor);
     const qty = item.qty||1;
     const amount = unit*qty;
     grand += amount; totalQty += qty;
     const area = (((item.W||0)*(item.H||0))/1e6).toFixed(2);
-    rowsHtml += `<tr style="background:${idx%2?'#f5fbfa':'#fff'}">
+    rowsHtml += `<tr style="background:${(_rowNo++)%2?'#f5fbfa':'#fff'}">
       <td style="border:1px solid #cfe3df;padding:4px;text-align:center;width:200px">${item.wo ? windowDiagramSVG(item, item.wo) : ''}</td>
       <td style="${tdC}">${idx+1}</td>
       <td style="${tdC}">${item.mark||'-'}</td>
